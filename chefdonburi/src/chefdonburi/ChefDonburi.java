@@ -70,7 +70,7 @@ public class ChefDonburi {
 
         // Pause the splash screen for 5 seconds
         try {
-            Thread.sleep(5000); // Increased sleep time to 5 seconds
+            Thread.sleep(1000); // Increased sleep time to 5 seconds
         } catch (InterruptedException e) {
             JOptionPane.showMessageDialog(frmSplash, "Error: " + e.getMessage());
         } finally {
