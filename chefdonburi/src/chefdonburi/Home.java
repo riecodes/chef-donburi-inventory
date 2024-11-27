@@ -191,7 +191,7 @@ public final class Home implements ActionListener {
                 JOptionPane.showMessageDialog(frmHome, "You do not have permission to view the logs.");
             }
         } else if (e.getSource() == btnInventory) {
-            Inventory inventory = new Inventory();
+            Inventory inventory = new Inventory(userID);
         } else if (e.getSource() == btnExpenses) {
             Expenses expenses = new Expenses();
         } else if (e.getSource() == btnSuppliers) {
@@ -228,10 +228,7 @@ public final class Home implements ActionListener {
         }
     }
 
-    public static void main(String[] args) {
-        int userID = 1; // Example userID passed from the Login class
-        Home home = new Home("admin", userID); // Pass role and userID
-    }
+
 }
 
 

@@ -1,4 +1,4 @@
- package chefdonburi;
+package chefdonburi;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -40,6 +40,7 @@ public class Login implements ActionListener {
 
     // Background image
     private Image backgroundImage;
+    private int userID;
 
     public Login() {
         // Load the background image
@@ -177,7 +178,7 @@ public class Login implements ActionListener {
             if (rs.next()) {
                 String storedPasswordHash = rs.getString("userPassword");
                 String role = rs.getString("role");
-                int userID = rs.getInt("userID");
+                userID = rs.getInt("userID");
 
                 // Verify password using BCrypt
                 if (BCrypt.checkpw(password, storedPasswordHash)) {
@@ -208,7 +209,11 @@ public class Login implements ActionListener {
             JOptionPane.showMessageDialog(frmLogin, "Error logging login event: " + ex.getMessage());
         }
     }
-
+    
+    // setter method to pass the userID to Inventory
+    public int getUserID() {
+        return userID;
+    }
     private void closeConnections() {
         try {
             if (rs != null) rs.close();

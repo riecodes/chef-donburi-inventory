@@ -26,7 +26,13 @@ public final class Inventory implements ActionListener {
     private PreparedStatement ps;
     private ResultSet rs;
 
-    Inventory() {
+
+
+    // User ID (Passed from the Login class)
+    private int userID; // User ID to track who last edited the inventory
+
+    public Inventory(int userID) {
+        this.userID = userID;
         init();
     }
 
@@ -847,7 +853,7 @@ private void editItem() {
 
             ps.executeUpdate();
             JOptionPane.showMessageDialog(frmInventoryManagement, "Item updated successfully!");
-            logInventoryLastEditedBy(itemId);
+            logInventoryLastEditedBy(userID, itemId);
             loadInventoryTable();
             return; // Exit after successful update
         } catch (SQLException e) {
@@ -860,14 +866,39 @@ private void editItem() {
     }
 }
 
-private void logInventoryLastEditedBy(int itemId) {
+private void logInventoryLastEditedBy(int userID, int itemId) {
+    PreparedStatement ps = null;
+    ResultSet rs = null;
+    String userName = null;
     try {
-        String query = "UDPATE inventory (LAST_EDITED_BY, LAST_EDITED_ON) VALUES (?, NOW())";
-        ps = connection.prepareStatement(query);
-        ps.setInt(1, itemId);
-        ps.executeUpdate();
+        // Retrieve userName using userID
+        String getUserQuery = "SELECT userName FROM users WHERE userID = ?";
+        ps = connection.prepareStatement(getUserQuery);
+        ps.setInt(1, userID);
+        rs = ps.executeQuery();
+        if (rs.next()) {
+            userName = rs.getString("userName");
+        }
+
+        if (userName != null) {
+            // Update inventory with LAST_EDITED_BY and LAST_EDITED_ON
+            String updateQuery = "UPDATE inventory SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
+            ps = connection.prepareStatement(updateQuery);
+            ps.setString(1, userName);
+            ps.setInt(2, itemId);
+            ps.executeUpdate();
+        } else {
+            JOptionPane.showMessageDialog(frmInventoryManagement, "User not found for ID: " + userID);
+        }
     } catch (SQLException ex) {
         JOptionPane.showMessageDialog(frmInventoryManagement, "Error logging last edited by event: " + ex.getMessage());
+    } finally {
+        try {
+            if (rs != null) rs.close();
+            if (ps != null) ps.close();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing database resources: " + ex.getMessage());
+        }
     }
 }
 
@@ -1052,7 +1083,8 @@ private void editItem2() {
 
 
     public static void main(String[] args) {
-        Inventory inventory = new Inventory();
+        
+        Inventory inventory = new Inventory(userID);
         
     }
 }
