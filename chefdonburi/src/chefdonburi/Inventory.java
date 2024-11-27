@@ -1,8 +1,5 @@
 package chefdonburi;
 
-import javax.swing.*;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -10,11 +7,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 
 public final class Inventory implements ActionListener {
-    
-    
     private static final Inventory instance = null;
     private JFrame frmInventoryManagement;
     private JTable inventoryTable, inventory2Table;
@@ -82,7 +80,7 @@ void init() {
     frmInventoryManagement.add(topPanel, BorderLayout.NORTH);
 
     // Inventory Table
-    model = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Unit", "Price", "Beginning", "In", "Out", "Scrap", "Spoilage", "Ending"}, 0);
+    model = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Unit", "Price", "Beginning", "In", "Out", "Scrap", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
     inventoryTable = new JTable(model);
     inventoryTable.setRowHeight(30);
 
@@ -118,7 +116,7 @@ void init() {
     inventoryPanel.add(btnPanel, BorderLayout.SOUTH);
 
     // Inventory2 Table
-    model2 = new DefaultTableModel(new String[]{"ID", "Category", "Item", "Price", "SF", "Beginning", "In", "Out", "Spoilage", "Ending"}, 0);
+    model2 = new DefaultTableModel(new String[]{"ID", "Category", "Item", "Price", "SF", "Beginning", "In", "Out", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
     inventory2Table = new JTable(model2);
     inventory2Table.setRowHeight(30);
 
@@ -224,7 +222,10 @@ void init() {
                         rs.getString("QUANTITY_OUT"),
                         rs.getString("SCRAP"),
                         rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL")
+                        rs.getString("ACTUAL"),
+                        rs.getString("LAST_EDITED_BY"),
+                        rs.getString("LAST_EDITED_ON")
+                        
                 });
             }
         } catch (SQLException e) {
@@ -252,7 +253,9 @@ void init() {
                         rs.getString("QUANTITY_IN"),
                         rs.getString("QUANTITY_OUT"),
                         rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL")
+                        rs.getString("ACTUAL"),
+                        rs.getString("LAST_EDITED_BY"),
+                        rs.getString("LAST_EDITED_ON")
                 });
             }
         } catch (SQLException e) {
@@ -281,7 +284,9 @@ void init() {
                         rs.getString("QUANTITY_OUT"),
                         rs.getString("SCRAP"),
                         rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL")
+                        rs.getString("ACTUAL"),
+                        rs.getString("LAST_EDITED_BY"),
+                        rs.getString("LAST_EDITED_ON")
                 });
             }
         } catch (SQLException e) {
@@ -309,7 +314,9 @@ void init() {
                         rs.getString("QUANTITY_IN"),
                         rs.getString("QUANTITY_OUT"),
                         rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL")
+                        rs.getString("ACTUAL"),
+                        rs.getString("LAST_EDITED_BY"),
+                        rs.getString("LAST_EDITED_ON")
                 });
             }
         } catch (SQLException e) {
@@ -840,6 +847,7 @@ private void editItem() {
 
             ps.executeUpdate();
             JOptionPane.showMessageDialog(frmInventoryManagement, "Item updated successfully!");
+            logInventoryLastEditedBy(itemId);
             loadInventoryTable();
             return; // Exit after successful update
         } catch (SQLException e) {
@@ -852,7 +860,16 @@ private void editItem() {
     }
 }
 
-
+private void logInventoryLastEditedBy(int itemId) {
+    try {
+        String query = "UDPATE inventory (LAST_EDITED_BY, LAST_EDITED_ON) VALUES (?, NOW())";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, itemId);
+        ps.executeUpdate();
+    } catch (SQLException ex) {
+        JOptionPane.showMessageDialog(frmInventoryManagement, "Error logging last edited by event: " + ex.getMessage());
+    }
+}
 
 private void editItem2() {
     int selectedRow = inventory2Table.getSelectedRow();

@@ -1,4 +1,4 @@
-package chefdonburi;
+ package chefdonburi;
 
 import java.awt.Color;
 import java.awt.Font;
@@ -44,7 +44,7 @@ public class Login implements ActionListener {
     public Login() {
         // Load the background image
         try {
-            backgroundImage = ImageIO.read(new File("src\\Images\\login_background.png"));
+            backgroundImage = ImageIO.read(new File("src\\Images\\home_bg.jpg"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -73,7 +73,7 @@ public class Login implements ActionListener {
 
         // Title label
         lblTitle = new JLabel("Welcome");
-        lblTitle.setForeground(new Color(242, 245, 224));
+        lblTitle.setForeground(new Color(0, 0, 0));
         lblTitle.setFont(new Font("Georgia", Font.BOLD, 40));
         lblTitle.setSize(250, 50);
         lblTitle.setLocation(925, 200);
@@ -81,7 +81,7 @@ public class Login implements ActionListener {
 
         // Username label and text field
         lblUser = new JLabel("Username:");
-        lblUser.setForeground(new Color(242, 245, 224));
+        lblUser.setForeground(new Color(0, 0, 0));
         lblUser.setFont(new Font("Arial", Font.BOLD, 20));
         lblUser.setSize(200, 25);
         lblUser.setLocation(780, 270);
@@ -93,7 +93,7 @@ public class Login implements ActionListener {
 
         // Password label and password field
         lblPassword = new JLabel("Password:");
-        lblPassword.setForeground(new Color(242, 245, 224));
+        lblPassword.setForeground(new Color(0, 0, 0));
         lblPassword.setFont(new Font("Arial", Font.BOLD, 20));
         lblPassword.setSize(200, 25);
         lblPassword.setLocation(780, 320);

@@ -1,5 +1,4 @@
 nagnonotif kapag konti nalang stock ilalagay sa ChefDonburi.java
-
 reference is Ending
 5kg for kg
 5pcs for pieces
