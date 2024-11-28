@@ -1,6 +1,5 @@
 package chefdonburi;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -16,8 +15,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
-
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -193,14 +190,14 @@ public final class Home implements ActionListener {
         btnLogout.addActionListener(this);
         pnlHome.add(btnLogout);
 
-        // Create the table to display logs
-        String[] columns = {"Log ID", "Username", "Login Time", "Logout Time"};
+        // Create the table to display alerts
+        String[] columns = { "Item ID", "Category", "Item Name", "Actual"};
         model = new DefaultTableModel(columns, 0); // Initialize table with no data
         table = new JTable(model);
 
         // Set table font and row height
         table.setFont(new Font("Arial", Font.PLAIN, 14));
-        table.setRowHeight(10);
+        table.setRowHeight(30);
 
         // Center align table values
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
@@ -309,66 +306,70 @@ private void loadAlerts(DefaultTableModel model) {
     try {
         connection = new Database().getConnection();  // Assume Database is a class that handles DB connection
 
-        // First, check the inventory for items that are below threshold (5kg or 5pcs)
+        // First, check the inventory for items that are above threshold (greater than 5kg or 5pcs)
         String inventoryQuery = """
-            SELECT inventory.itemID, inventory.itemName, inventory.actual
+            SELECT inventory.ID, inventory.CATEGORY, inventory.ITEMS, inventory.ACTUAL
             FROM inventory
-            WHERE inventory.actual < 5
+            WHERE CAST(REGEXP_REPLACE(inventory.ACTUAL, '[^0-9.]', '') AS DOUBLE) > 5
         """;
         
         ps = connection.prepareStatement(inventoryQuery);
         rs = ps.executeQuery();
 
         while (rs.next()) {
-            // For each item that meets the threshold condition, insert an alert
-            int itemID = rs.getInt("itemID");
-            String itemName = rs.getString("itemName");
-            double actual = rs.getDouble("actual");
+            int itemID = rs.getInt("ID");
+            String itemName = rs.getString("ITEMS");
+            String category = rs.getString("CATEGORY");
+            String actualStr = rs.getString("ACTUAL");
 
-            // Insert into the alerts table
-            String insertAlertQuery = """
-                INSERT INTO alerts (itemID, itemName, actual, alertTime, resolved)
-                VALUES (?, ?, ?, NOW(), 0)
-            """;
-            try (PreparedStatement insertPs = connection.prepareStatement(insertAlertQuery)) {
-                insertPs.setInt(1, itemID);
-                insertPs.setString(2, itemName);
-                insertPs.setDouble(3, actual);
-                insertPs.executeUpdate();
-            } catch (SQLException e) {
-                // Handle any issues inserting into the alerts table
-                e.printStackTrace();
+            // Remove any non-numeric characters (except dot)
+            double actual = 0;
+            try {
+                actual = Double.parseDouble(actualStr.replaceAll("[^0-9.]", ""));
+            } catch (NumberFormatException e) {
+                actual = 0;
+            }
+
+            // Only insert into alerts if the actual value is greater than 5 and the alert doesn't already exist
+            if (actual > 5) {
+                // Check if the alert for this item already exists
+                String checkAlertQuery = """
+                    SELECT COUNT(*) FROM alerts WHERE itemID = ?
+                """;
+                try (PreparedStatement checkPs = connection.prepareStatement(checkAlertQuery)) {
+                    checkPs.setInt(1, itemID);
+                    ResultSet checkRs = checkPs.executeQuery();
+                    checkRs.next();
+                    int alertCount = checkRs.getInt(1);
+
+                    // If no alert exists for this item, insert it
+                    if (alertCount == 0) {
+                        String insertAlertQuery = """
+                            INSERT INTO alerts (itemID, category, itemName, actual)
+                            VALUES (?, ?, ?, ?)
+                        """;
+                        try (PreparedStatement insertPs = connection.prepareStatement(insertAlertQuery)) {
+                            insertPs.setInt(1, itemID);
+                            insertPs.setString(2, category); // Insert the correct category
+                            insertPs.setString(3, itemName); // Insert the correct itemName
+                            insertPs.setDouble(4, actual);
+                            insertPs.executeUpdate();
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+
+                // Add the item to the table model, including the category
+                model.addRow(new Object[] {
+                    itemID,         // Item ID
+                    category,       // Category
+                    itemName,       // Item Name
+                    actual          // Actual value
+                });
             }
         }
 
-        // Now, load the alerts into the table
-        String loadAlertsQuery = """
-            SELECT alerts.alertID, alerts.itemID, alerts.itemName, alerts.actual, alerts.alertTime, alerts.resolved
-            FROM alerts
-        """;
-
-        ps = connection.prepareStatement(loadAlertsQuery);
-        rs = ps.executeQuery();
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM dd, yyyy   HH:mm:ss");
-
-        while (rs.next()) {
-            // Format the alert time
-            String alertTime = rs.getTimestamp("alertTime") != null 
-                    ? dateFormat.format(rs.getTimestamp("alertTime")) 
-                    : "N/A";
-
-            // Retrieve the resolved status and display it as 'Yes' or 'No'
-            String resolved = rs.getBoolean("resolved") ? "Yes" : "No";
-
-            model.addRow(new Object[]{
-                    rs.getInt("alertID"),          // Alert ID
-                    rs.getString("itemName"),      // Item Name
-                    rs.getDouble("actual"),        // Actual value
-                    alertTime,                     // Formatted alert time
-                    resolved                       // Resolved status (Yes/No)
-            });
-        }
     } catch (SQLException e) {
         JOptionPane.showMessageDialog(frame, "Error loading alerts: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
     } finally {
@@ -376,13 +377,16 @@ private void loadAlerts(DefaultTableModel model) {
     }
 }
 
+
+
+
     // Delete the selected log from the database
     private void deleteAlerts() {
         int selectedRow = table.getSelectedRow(); // Get the selected row
         if (selectedRow >= 0) {
             int alertID = (int) model.getValueAt(selectedRow, 0); // Get the Log ID from the selected row
 
-            int confirm = JOptionPane.showConfirmDialog(frame, "Are you sure you want to delete this log?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+            int confirm = JOptionPane.showConfirmDialog(frame, "Are you sure you want to delete this alert?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 try {
                     connection = new Database().getConnection();  // Get database connection
@@ -392,10 +396,10 @@ private void loadAlerts(DefaultTableModel model) {
                     int rowsAffected = ps.executeUpdate();
 
                     if (rowsAffected > 0) {
-                        JOptionPane.showMessageDialog(frame, "Log deleted successfully.");
+                        JOptionPane.showMessageDialog(frame, "Alert deleted successfully.");
                         loadAlerts(model); // Refresh the table
                     } else {
-                        JOptionPane.showMessageDialog(frame, "Failed to delete the log.", "Error", JOptionPane.ERROR_MESSAGE);
+                        JOptionPane.showMessageDialog(frame, "Failed to delete the alert.", "Error", JOptionPane.ERROR_MESSAGE);
                     }
                 } catch (SQLException e) {
                     JOptionPane.showMessageDialog(frame, "Error deleting alert: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
