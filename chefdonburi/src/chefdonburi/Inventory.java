@@ -273,8 +273,6 @@ void init() {
 
     private void loadInventoryTable() {
     model.setRowCount(0); // Clear the table before loading new data
-    PreparedStatement ps = null;
-    ResultSet rs = null;
 
     try {
         connection = new Database().getConnection();

@@ -27,7 +27,11 @@ public final class Expenses implements ActionListener {
     private PreparedStatement ps;
     private ResultSet rs;
 
+    // User ID (Passed from the Login class)
+    private int userID; // User ID to track who last edited the inventory
+
     public Expenses() {
+        this.userID = userID;
         init();
     }
 
@@ -63,8 +67,7 @@ public final class Expenses implements ActionListener {
 
         // Table setup
         model = new DefaultTableModel(
-                new String[]{"ID", "Item Name", "Item Price", "Number/Unit", "Source of Purchase", "Mode of Payment", "Date & Time"},
-                0
+                new String[]{"ID", "Item Name", "Item Price", "Number/Unit", "Source of Purchase", "Mode of Payment", "Date & Time", "Last Edited By", "Last Edited On"},0
         );
         expensesTable = new JTable(model);
         expensesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -194,7 +197,21 @@ public final class Expenses implements ActionListener {
 
         try {
             connection = new Database().getConnection();
-            ps = connection.prepareStatement("SELECT * FROM expenses");
+
+            // Query using * for inventory table and only selecting userName from users table
+            String query = """
+                SELECT 
+                    e.*, 
+                    u.userName AS LastEditedBy
+                FROM 
+                    expenses e
+                LEFT JOIN 
+                    users u 
+                ON 
+                    e.LAST_EDITED_BY = u.userID
+            """;
+
+            ps = connection.prepareStatement(query);
             rs = ps.executeQuery();
 
             while (rs.next()) {
@@ -365,6 +382,7 @@ private void editExpense() {
                     ps.executeUpdate();
 
                     // Refresh the table
+                    logExpenses(userID, id);
                     loadExpensesTable();
                     JOptionPane.showMessageDialog(frmExpenses, "Expense updated successfully!");
                     break; // Exit the loop when successful
@@ -384,7 +402,25 @@ private void editExpense() {
     }
 }
 
-
+private void logExpenses(int userID, int id) {
+    PreparedStatement ps = null;
+    try {
+        // Query to update the inventory table with LAST_EDITED_BY and LAST_EDITED_ON
+        String query = "UPDATE expenses SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, userID); // Update LAST_EDITED_BY with userID
+        ps.setInt(2, id); // Specify the itemId to update
+        ps.executeUpdate();
+    } catch (SQLException ex) {
+        JOptionPane.showMessageDialog(frmExpenses, "Error logging last edited by event: " + ex.getMessage());
+    } finally {
+        try {
+            if (ps != null) ps.close();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(frmExpenses, "Error closing resources: " + ex.getMessage());
+        }
+    }
+}
 
  private void deleteExpense() {
     int selectedRow = expensesTable.getSelectedRow();
