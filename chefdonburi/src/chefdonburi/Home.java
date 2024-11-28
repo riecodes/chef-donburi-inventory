@@ -376,9 +376,6 @@ private void loadAlerts(DefaultTableModel model) {
     }
 }
 
-
-
-
     // Delete the selected log from the database
     private void deleteAlerts() {
         int selectedRow = table.getSelectedRow(); // Get the selected row
