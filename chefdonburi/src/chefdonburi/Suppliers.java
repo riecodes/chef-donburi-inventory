@@ -21,7 +21,11 @@ public final class Suppliers implements ActionListener {
     private JButton btnAdd, btnEdit, btnDelete, btnRefresh;
     private JLabel lblDate;
 
-    public Suppliers() {
+    // User ID (Passed from the Login class)
+    private int userID; // User ID to track who last edited the supplies
+
+    public Suppliers(int userID) {
+        this.userID = userID;
         init();
     }
 
@@ -44,7 +48,7 @@ public final class Suppliers implements ActionListener {
         frmSuppliersManagement.add(datePanel, BorderLayout.NORTH);
 
         // Table model setup
-        model = new DefaultTableModel(new String[]{"ID", "Supplier Name", "Description", "Address", "Contact Number", "Store Link"}, 0);
+        model = new DefaultTableModel(new String[]{"ID", "Supplier Name", "Description", "Address", "Contact Number", "Store Link", "Last Edited By", "Last Edited On"}, 0);
         suppliersTable = new JTable(model);
         suppliersTable.setFont(new Font("Arial", Font.PLAIN, 14));
         suppliersTable.setRowHeight(25);
@@ -123,24 +127,51 @@ public final class Suppliers implements ActionListener {
     private void loadSuppliersTable() {
         model.setRowCount(0); // Clear existing rows
         try (Connection connection = new Database().getConnection()) {
-            String query = "SELECT SupplierID, SupplierName, Description, Address, ContactNumber, StoreLink FROM suppliers";
+            String query = """
+                SELECT 
+                    s.SupplierID, 
+                    s.SupplierName, 
+                    s.Description, 
+                    s.Address, 
+                    s.ContactNumber, 
+                    s.StoreLink, 
+                    u.userName AS LastEditedBy, 
+                    s.LAST_EDITED_ON 
+                FROM 
+                    suppliers s
+                LEFT JOIN 
+                    users u 
+                ON 
+                    s.LAST_EDITED_BY = u.userID
+            """;
             try (PreparedStatement ps = connection.prepareStatement(query);
                  ResultSet rs = ps.executeQuery()) {
-
+                
+                    // Query using * for inventory table and only selecting userName from users table
+            // Query to fetch supplier details and join with users table for LastEditedBy
+            
+            
                 while (rs.next()) {
-                    model.addRow(new Object[]{
-                            rs.getInt("supplierID"),
-                            rs.getString("supplierName"),
-                            rs.getString("description"),
-                            rs.getString("address"),
-                            rs.getString("contactNumber"),
-                            rs.getString("storeLink")
-                    });
+                    addRowToModel(rs);
                 }
             }
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(frmSuppliersManagement, "Error loading suppliers: " + e.getMessage());
         }
+    }
+
+    // Helper method to add a row to the table model
+    private void addRowToModel(ResultSet rs) throws SQLException {
+        model.addRow(new Object[]{
+                rs.getInt("SupplierID"),
+                rs.getString("SupplierName"),
+                rs.getString("Description"),
+                rs.getString("Address"),
+                rs.getString("ContactNumber"),
+                rs.getString("StoreLink"),
+                rs.getString("LastEditedBy"),
+                rs.getString("LAST_EDITED_ON")
+        });
     }
 
     private void addSupplier() {
@@ -220,6 +251,7 @@ public final class Suppliers implements ActionListener {
                         ps.setInt(6, supplierId);
                         ps.executeUpdate();
                         JOptionPane.showMessageDialog(frmSuppliersManagement, "Supplier updated successfully.");
+                        logSuppliers(userID, supplierId); // Log the last edited by event
                         loadSuppliersTable();
                     }
                 } catch (SQLException e) {
@@ -230,6 +262,20 @@ public final class Suppliers implements ActionListener {
             JOptionPane.showMessageDialog(frmSuppliersManagement, "Please select a supplier to edit.");
         }
     }
+
+    private void logSuppliers(int userID, int supplierId) {
+        try (Connection connection = new Database().getConnection(); 
+             PreparedStatement ps = connection.prepareStatement(
+                "UPDATE suppliers SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE SupplierID = ?")) {
+            // Set parameters
+            ps.setInt(1, userID); // Update LAST_EDITED_BY with userID
+            ps.setInt(2, supplierId); // Specify the supplierId to update
+            ps.executeUpdate();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(frmSuppliersManagement, "Error logging last edited by event: " + ex.getMessage());
+        }
+    }
+    
 
     private void deleteSupplier() {
         int selectedRow = suppliersTable.getSelectedRow();
@@ -252,10 +298,6 @@ public final class Suppliers implements ActionListener {
         } else {
             JOptionPane.showMessageDialog(frmSuppliersManagement, "Please select a supplier to delete.");
         }
-    }
-
-    public static void main(String[] args) {
-        Suppliers suppliers = new Suppliers();
     }
 }
 

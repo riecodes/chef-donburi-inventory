@@ -187,9 +187,6 @@ public class Logs {
         }
     }
 
-    public static void main(String[] args) {
-        Logs logs = new Logs();
-    }
 }
 
 

@@ -28,9 +28,9 @@ public final class Expenses implements ActionListener {
     private ResultSet rs;
 
     // User ID (Passed from the Login class)
-    private int userID; // User ID to track who last edited the inventory
+    private int userID; // User ID to track who last edited the expenses
 
-    public Expenses() {
+    public Expenses(int userID) {
         this.userID = userID;
         init();
     }
@@ -245,8 +245,10 @@ public final class Expenses implements ActionListener {
         String source = rs.getString("SOURCE");
         String modeOfPayment = rs.getString("MODE_OF_PAYMENT");
         String dateTime = rs.getString("DATE_TIME");
+        String lastEditedBy = rs.getString("LastEditedBy");
+        Date lastEditedOn = rs.getTimestamp("LAST_EDITED_ON");
         String formattedDate = formatDate(dateTime, "yyyy-MM-dd HH:mm:ss", "MMMM d, yyyy HH:mm:ss");
-        model.addRow(new Object[]{id, itemName, itemPrice, numberUnit, source, modeOfPayment, formattedDate});
+        model.addRow(new Object[]{id, itemName, itemPrice, numberUnit, source, modeOfPayment, formattedDate, lastEditedBy, lastEditedOn});
     }
 
    private void addExpense() {
@@ -464,10 +466,6 @@ private void logExpenses(int userID, int id) {
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(frmExpenses, "Error closing connections: " + e.getMessage());
         }
-    }
-
-    public static void main(String[] args) {
-        Expenses expenses = new Expenses();
     }
 }
 

@@ -86,7 +86,7 @@ void init() {
     frmInventoryManagement.add(topPanel, BorderLayout.NORTH);
 
     // Inventory Table
-    model = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Unit", "Price", "Beginning", "In", "Out", "Scrap", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
+    model = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Unit", "Price", "Beginning", "In", "Out", "Scrap", "Spoilage", "Ending", "Last Edited By", "Last Edited On"}, 0);
     inventoryTable = new JTable(model);
     inventoryTable.setRowHeight(30);
 
