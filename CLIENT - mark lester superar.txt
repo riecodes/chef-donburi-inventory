@@ -1,9 +1,0 @@
-nagnonotif kapag konti nalang stock ilalagay sa ChefDonburi.java
-reference is Ending
-5kg for kg
-5pcs for pieces
-
-lalagyan mga table sa dulo ng lasteditedby and lastediton sa inventory, expenses, suppliers
-
-print pdf report inventory summary and expenses summary w/out price
-
