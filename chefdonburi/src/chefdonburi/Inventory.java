@@ -272,67 +272,97 @@ void init() {
     }
 
     private void loadInventoryTable() {
-        model.setRowCount(0);
-        try {
-            connection = new Database().getConnection();
-            ps = connection.prepareStatement("SELECT * FROM inventory");
-            rs = ps.executeQuery();
+    model.setRowCount(0); // Clear the table before loading new data
+    PreparedStatement ps = null;
+    ResultSet rs = null;
 
-            while (rs.next()) {
-                model.addRow(new Object[]{
-                        rs.getInt("ID"),
-                        rs.getString("CATEGORY"),
-                        rs.getString("ITEMS"),
-                        rs.getString("UNIT"),
-                        rs.getDouble("PRICE"),
-                        rs.getString("BEGINNING"),
-                        rs.getString("QUANTITY_IN"),
-                        rs.getString("QUANTITY_OUT"),
-                        rs.getString("SCRAP"),
-                        rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL"),
-                        rs.getString("LAST_EDITED_BY"),
-                        rs.getString("LAST_EDITED_ON")
-                });
-            }
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(frmInventoryManagement, "Error loading inventory: " + e.getMessage());
-        } finally {
-            closeConnections();
+    try {
+        connection = new Database().getConnection();
+
+        // Query using * for inventory table and only selecting userName from users table
+        String query = """
+            SELECT 
+                i.*, 
+                u.userName AS LastEditedBy
+            FROM 
+                inventory i
+            LEFT JOIN 
+                users u 
+            ON 
+                i.LAST_EDITED_BY = u.userID
+        """;
+
+        ps = connection.prepareStatement(query);
+        rs = ps.executeQuery();
+
+        while (rs.next()) {
+            model.addRow(new Object[]{
+                rs.getInt("ID"),
+                rs.getString("CATEGORY"),
+                rs.getString("ITEMS"),
+                rs.getString("UNIT"),
+                rs.getDouble("PRICE"),
+                rs.getString("BEGINNING"),
+                rs.getString("QUANTITY_IN"),
+                rs.getString("QUANTITY_OUT"),
+                rs.getString("SCRAP"),
+                rs.getString("SPOILAGE"),
+                rs.getString("ACTUAL"),
+                rs.getString("LastEditedBy"), // Fetches userName from users table
+                rs.getString("LAST_EDITED_ON")
+            });
         }
+    } catch (SQLException e) {
+        JOptionPane.showMessageDialog(frmInventoryManagement, "Error loading inventory: " + e.getMessage());
+    } finally {
+        closeConnections(); // Ensure resources are released
     }
+}
+
 
     private void loadInventory2Table() {
         model2.setRowCount(0);
         try {
-            connection = new Database().getConnection();
-            ps = connection.prepareStatement("SELECT * FROM inventory2");
-            rs = ps.executeQuery();
+        connection = new Database().getConnection();
 
-            while (rs.next()) {
-                model2.addRow(new Object[]{
-                        rs.getInt("ID"),
-                        rs.getString("CATEGORY"),
-                        rs.getString("ITEM"),
-                        rs.getDouble("PRICE"),
-                        rs.getDouble("SF"),
-                        rs.getString("BEGINNING"),
-                        rs.getString("QUANTITY_IN"),
-                        rs.getString("QUANTITY_OUT"),
-                        rs.getString("SPOILAGE"),
-                        rs.getString("ACTUAL"),
-                        rs.getString("LAST_EDITED_BY"),
-                        rs.getString("LAST_EDITED_ON")
-                });
-            }
-        } catch (SQLException e) {
+        // Query using * for inventory table and only selecting userName from users table
+        String query = """
+            SELECT 
+                i.*, 
+                u.userName AS LastEditedBy
+            FROM 
+                inventory2 i
+            LEFT JOIN 
+                users u 
+            ON 
+                i.LAST_EDITED_BY = u.userID
+        """;
+
+        ps = connection.prepareStatement(query);
+        rs = ps.executeQuery();
+
+        while (rs.next()) {
+            model2.addRow(new Object[]{
+                rs.getInt("ID"),
+                rs.getString("CATEGORY"),
+                rs.getString("ITEM"),
+                rs.getDouble("PRICE"),
+                rs.getDouble("SF"),
+                rs.getString("BEGINNING"),
+                rs.getString("QUANTITY_IN"),
+                rs.getString("QUANTITY_OUT"),
+                rs.getString("SPOILAGE"),
+                rs.getString("ACTUAL"),
+                rs.getString("LastEditedBy"),
+                rs.getString("LAST_EDITED_ON")
+            });
+        }
+    } catch (SQLException e) {
             JOptionPane.showMessageDialog(frmInventoryManagement, "Error loading inventory2: " + e.getMessage());
         } finally {
             closeConnections();
         }
     }
-
-
 
 private void carryOverEndingStock(JTable inventoryTable1, DefaultTableModel model1, String inventory) {
     int selectedRow = inventoryTable1.getSelectedRow();
@@ -853,7 +883,7 @@ private void editItem() {
 
             ps.executeUpdate();
             JOptionPane.showMessageDialog(frmInventoryManagement, "Item updated successfully!");
-            logInventoryLastEditedBy(userID, itemId);
+            logInventory(userID, itemId);
             loadInventoryTable();
             return; // Exit after successful update
         } catch (SQLException e) {
@@ -866,41 +896,46 @@ private void editItem() {
     }
 }
 
-private void logInventoryLastEditedBy(int userID, int itemId) {
+private void logInventory(int userID, int itemId) {
     PreparedStatement ps = null;
-    ResultSet rs = null;
-    String userName = null;
     try {
-        // Retrieve userName using userID
-        String getUserQuery = "SELECT userName FROM users WHERE userID = ?";
-        ps = connection.prepareStatement(getUserQuery);
-        ps.setInt(1, userID);
-        rs = ps.executeQuery();
-        if (rs.next()) {
-            userName = rs.getString("userName");
-        }
-
-        if (userName != null) {
-            // Update inventory with LAST_EDITED_BY and LAST_EDITED_ON
-            String updateQuery = "UPDATE inventory SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
-            ps = connection.prepareStatement(updateQuery);
-            ps.setString(1, userName);
-            ps.setInt(2, itemId);
-            ps.executeUpdate();
-        } else {
-            JOptionPane.showMessageDialog(frmInventoryManagement, "User not found for ID: " + userID);
-        }
+        // Query to update the inventory table with LAST_EDITED_BY and LAST_EDITED_ON
+        String query = "UPDATE inventory SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, userID); // Update LAST_EDITED_BY with userID
+        ps.setInt(2, itemId); // Specify the itemId to update
+        ps.executeUpdate();
     } catch (SQLException ex) {
         JOptionPane.showMessageDialog(frmInventoryManagement, "Error logging last edited by event: " + ex.getMessage());
     } finally {
         try {
-            if (rs != null) rs.close();
             if (ps != null) ps.close();
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing database resources: " + ex.getMessage());
+            JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing resources: " + ex.getMessage());
         }
     }
 }
+
+private void logInventory2(int userID, int itemId) {
+    PreparedStatement ps = null;
+    try {
+        // Query to update the inventory table with LAST_EDITED_BY and LAST_EDITED_ON
+        String query = "UPDATE inventory2 SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, userID); // Update LAST_EDITED_BY with userID
+        ps.setInt(2, itemId); // Specify the itemId to update
+        ps.executeUpdate();
+    } catch (SQLException ex) {
+        JOptionPane.showMessageDialog(frmInventoryManagement, "Error logging last edited by event: " + ex.getMessage());
+    } finally {
+        try {
+            if (ps != null) ps.close();
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing resources: " + ex.getMessage());
+        }
+    }
+}
+
 
 private void editItem2() {
     int selectedRow = inventory2Table.getSelectedRow();
@@ -1001,6 +1036,7 @@ private void editItem2() {
 
             ps.executeUpdate();
             JOptionPane.showMessageDialog(frmInventoryManagement, "Item in Inventory2 updated successfully!");
+            logInventory2(userID, itemId);
             loadInventory2Table();
             return; // Exit after successful update
         } catch (SQLException e) {
@@ -1079,14 +1115,7 @@ private void editItem2() {
             JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing connections: " + e.getMessage());
         }
     }
-    
 
-
-    public static void main(String[] args) {
-        
-        Inventory inventory = new Inventory(userID);
-        
-    }
 }
 
 
