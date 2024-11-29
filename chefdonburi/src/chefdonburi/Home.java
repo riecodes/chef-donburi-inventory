@@ -38,7 +38,7 @@ public final class Home implements ActionListener {
     private JFrame frame;
     private JTable table;
     private DefaultTableModel model;
-    private JButton btnRefresh, btnDelete;
+    private JButton btnRefresh;
 
     // Database connection variables
     private Connection connection;
@@ -226,15 +226,9 @@ public final class Home implements ActionListener {
         btnRefresh.setBackground(new Color(223, 49, 42));
         btnRefresh.setFont(new Font("Arial", Font.BOLD, 14));
 
-        btnDelete = new JButton("Delete");
-        btnDelete.setForeground(new Color(242, 245, 224));
-        btnDelete.setBackground(new Color(223, 49, 42));
-        btnDelete.setFont(new Font("Arial", Font.BOLD, 14));
-
         // Add buttons to a button panel and position it at the bottom of the frame
         JPanel btnPanel = new JPanel();
         btnPanel.add(btnRefresh);
-        btnPanel.add(btnDelete);
         btnPanel.setBounds(50, 520, 1166, 50); // Manually set the position of the button panel
         pnlHome.add(btnPanel);
 
@@ -242,7 +236,6 @@ public final class Home implements ActionListener {
 
         // Add action listeners for the buttons
         btnRefresh.addActionListener(e -> loadAlerts(model));
-        btnDelete.addActionListener(e -> deleteAlerts());
 
         frmHome.add(pnlHome);
         frmHome.setVisible(true);
@@ -268,7 +261,7 @@ public final class Home implements ActionListener {
         } else if (e.getSource() == btnSuppliers) {
             Suppliers suppliers = new Suppliers(userID);
         } else if (e.getSource() == btnReports) {
-            JOptionPane.showMessageDialog(frmHome, "Reports Feature Not Implemented Yet.");
+            Reports reports = new Reports();
         } else if (e.getSource() == btnLogout) {
             confirmAndLogout();
         }
@@ -306,13 +299,13 @@ private void loadAlerts(DefaultTableModel model) {
     try {
         connection = new Database().getConnection();  // Assume Database is a class that handles DB connection
 
-        // First, check the inventory for items that are above threshold (greater than 5kg or 5pcs)
+        // Query to check inventory for items that are below the threshold (less than or equal to 5kg or 5pcs)
         String inventoryQuery = """
             SELECT inventory.ID, inventory.CATEGORY, inventory.ITEMS, inventory.ACTUAL
             FROM inventory
-            WHERE CAST(REGEXP_REPLACE(inventory.ACTUAL, '[^0-9.]', '') AS DOUBLE) > 5
+            WHERE CAST(REGEXP_REPLACE(inventory.ACTUAL, '[^0-9.]', '') AS DOUBLE) <= 5
         """;
-        
+
         ps = connection.prepareStatement(inventoryQuery);
         rs = ps.executeQuery();
 
@@ -330,8 +323,8 @@ private void loadAlerts(DefaultTableModel model) {
                 actual = 0;
             }
 
-            // Only insert into alerts if the actual value is greater than 5 and the alert doesn't already exist
-            if (actual > 5) {
+            // Only insert into alerts if the actual value is less than or equal to 5 and the alert doesn't already exist
+            if (actual <= 5) {
                 // Check if the alert for this item already exists
                 String checkAlertQuery = """
                     SELECT COUNT(*) FROM alerts WHERE itemID = ?
@@ -376,41 +369,6 @@ private void loadAlerts(DefaultTableModel model) {
         closeConnections();
     }
 }
-
-
-
-
-    // Delete the selected log from the database
-    private void deleteAlerts() {
-        int selectedRow = table.getSelectedRow(); // Get the selected row
-        if (selectedRow >= 0) {
-            int alertID = (int) model.getValueAt(selectedRow, 0); // Get the Log ID from the selected row
-
-            int confirm = JOptionPane.showConfirmDialog(frame, "Are you sure you want to delete this alert?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
-            if (confirm == JOptionPane.YES_OPTION) {
-                try {
-                    connection = new Database().getConnection();  // Get database connection
-                    String query = "DELETE FROM alerts WHERE alertID = ?";
-                    ps = connection.prepareStatement(query);
-                    ps.setInt(1, alertID); // Set the Log ID in the query
-                    int rowsAffected = ps.executeUpdate();
-
-                    if (rowsAffected > 0) {
-                        JOptionPane.showMessageDialog(frame, "Alert deleted successfully.");
-                        loadAlerts(model); // Refresh the table
-                    } else {
-                        JOptionPane.showMessageDialog(frame, "Failed to delete the alert.", "Error", JOptionPane.ERROR_MESSAGE);
-                    }
-                } catch (SQLException e) {
-                    JOptionPane.showMessageDialog(frame, "Error deleting alert: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                } finally {
-                    closeConnections();
-                }
-            }
-        } else {
-            JOptionPane.showMessageDialog(frame, "Please select an alert to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
-        }
-    }
 
     private void closeConnections() {
         try {
