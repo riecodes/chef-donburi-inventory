@@ -1,25 +1,34 @@
 package chefdonburi;
 
+import com.lowagie.text.Document;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Table;
+import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.Font;
+import com.lowagie.text.Font;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Document;
+import com.lowagie.text.Cell;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.pdf.PdfPTable;
+
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.sql.*;
+import java.time.LocalDate;
+
+
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
-import java.awt.print.PageFormat;
-import java.awt.print.Paper;
-import java.awt.print.Printable;
-import java.awt.print.PrinterException;
-import java.awt.print.PrinterJob;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import javax.swing.ImageIcon;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
+
+import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+
+
+
 
 public class Reports {
 
@@ -50,12 +59,12 @@ public class Reports {
         JButton btnPrintInventory = new JButton("Print Inventory");
         btnPrintInventory.setForeground(new Color(242, 245, 224));
         btnPrintInventory.setBackground(new Color(223, 49, 42));
-        btnPrintInventory.setFont(new Font("Arial", Font.BOLD, 14));
+        
 
         JButton btnPrintExpenses = new JButton("Print Expenses");
         btnPrintExpenses.setForeground(new Color(242, 245, 224));
         btnPrintExpenses.setBackground(new Color(223, 49, 42));
-        btnPrintExpenses.setFont(new Font("Arial", Font.BOLD, 14));
+        
 
         panel.add(btnPrintInventory, gbc);
         gbc.gridy++;
@@ -64,99 +73,83 @@ public class Reports {
         frame.add(panel);
         frame.setVisible(true);
 
-        btnPrintInventory.addActionListener(e -> printInventory());
+        btnPrintInventory.addActionListener(e -> generateInventoryReport());
         btnPrintExpenses.addActionListener(e -> printExpenses());
     }
 
-    private void printInventory() {
-        DefaultTableModel model = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Unit", "Price", "Beginning", "In", "Out", "Scrap", "Spoilage", "Ending", "Last Edited By", "Last Edited On"}, 0);
-        DefaultTableModel model2 = new DefaultTableModel(new String[]{"ID", "Category", "Item", "Price", "SF", "Beginning", "In", "Out", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
+    private void generateInventoryReport() {
+        // Create a new document
+        Document document = new Document();
 
-        // Fetch data from Inventory table
+        // Declare FileNotFoundException within try-catch block
         try {
-            connection = new Database().getConnection();
-            ps = connection.prepareStatement("SELECT * FROM Inventory");
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                model.addRow(new Object[]{rs.getInt("ID"), rs.getString("Category"), rs.getString("Items"), rs.getString("Unit"), rs.getDouble("Price"), rs.getInt("Beginning"), rs.getInt("In"), rs.getInt("Out"), rs.getInt("Scrap"), rs.getInt("Spoilage"), rs.getInt("Ending"), rs.getString("Last Edited By"), rs.getString("Last Edited On")});
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+            // Create a PDF writer to write to a file
+            PdfWriter.getInstance(document, new FileOutputStream("inventory_report.pdf"));
+            
+            // Open the document to start writing
+            document.open();
 
-        // Fetch data from Inventory2 table
-        try {
-            connection = new Database().getConnection();
-            ps = connection.prepareStatement("SELECT * FROM Inventory2");
-            rs = ps.executeQuery();
-            while (rs.next()) {
-                model2.addRow(new Object[]{rs.getInt("ID"), rs.getString("Category"), rs.getString("Item"), rs.getDouble("Price"), rs.getString("SF"), rs.getInt("Beginning"), rs.getInt("In"), rs.getInt("Out"), rs.getInt("Spoilage"), rs.getInt("Ending"), rs.getString("LastEditedBy"), rs.getString("LastEditedOn")});
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+            // Add title to the document
+            document.add(new Paragraph("Inventory Report", new Font(Font.HELVETICA, 16, Font.BOLD)));
+            document.add(new Paragraph("Generated on: " + java.time.LocalDate.now(), new Font(Font.HELVETICA, 10, Font.ITALIC)));
+            document.add(new Paragraph("\n"));
 
-        // Print the data
-        PrinterJob job = PrinterJob.getPrinterJob();
-        job.setPrintable(new Printable() {
-            @Override
-            public int print(java.awt.Graphics g, PageFormat pf, int page) throws PrinterException {
-                if (page > 0) {
-                    return NO_SUCH_PAGE;
+            // Create a table with 7 columns (based on your inventory table structure)
+            PdfPTable table = new PdfPTable(7);  // 7 columns for: Category, Item, Unit, Price, Quantity In, Quantity Out, Actual
+
+            // Add table headers
+            table.addCell("Category");
+            table.addCell("Item");
+            table.addCell("Unit");
+            table.addCell("Price");
+            table.addCell("Quantity In");
+            table.addCell("Quantity Out");
+            table.addCell("Actual");
+
+            // SQL query to fetch inventory data
+            String query = "SELECT * FROM inventory";
+            
+            try (Connection connection = new Database().getConnection()) {
+                Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(query);
+                // Loop through the result set and add each row to the table
+                while (rs.next()) {
+                    // Fetching data from each column
+                    String category = rs.getString("CATEGORY");
+                    String item = rs.getString("ITEMS");
+                    String unit = rs.getString("UNIT");
+                    String price = rs.getString("PRICE");  // As string, to avoid conversion error
+                    String quantityIn = rs.getString("QUANTITY_IN");  // As string, in case it's mixed with text like 'kg'
+                    String quantityOut = rs.getString("QUANTITY_OUT");  // As string
+                    String actual = rs.getString("ACTUAL");  // As string
+
+                    // Add each column value to the table
+                    table.addCell(category);
+                    table.addCell(item);
+                    table.addCell(unit);
+                    table.addCell(price);  // No formatting needed
+                    table.addCell(quantityIn);  // No formatting needed
+                    table.addCell(quantityOut);  // No formatting needed
+                    table.addCell(actual);  // No formatting needed
                 }
-
-                // Set landscape orientation
-                pf.setOrientation(PageFormat.LANDSCAPE);
-
-                // Set paper size to long
-                Paper paper = new Paper();
-                paper.setSize(595, 842); // A4 size in points
-                paper.setImageableArea(0, 0, paper.getWidth(), paper.getHeight());
-                pf.setPaper(paper);
-
-                // Print the data in two columns
-                int y = 20;
-                int x = 20;
-                int columnWidth = (int) (pf.getImageableWidth() / 2) - 40;
-                g.setFont(new Font("Arial", Font.PLAIN, 10));
-
-                // Print Inventory table data
-                for (int i = 0; i < model.getRowCount(); i++) {
-                    if (y > pf.getImageableHeight() - 20) {
-                        y = 20;
-                        x += columnWidth + 40;
-                    }
-                    for (int j = 0; j < model.getColumnCount(); j++) {
-                        g.drawString(model.getValueAt(i, j).toString(), x + j * 50, y);
-                    }
-                    y += 15;
-                }
-
-                // Print Inventory2 table data
-                for (int i = 0; i < model2.getRowCount(); i++) {
-                    if (y > pf.getImageableHeight() - 20) {
-                        y = 20;
-                        x += columnWidth + 40;
-                    }
-                    for (int j = 0; j < model2.getColumnCount(); j++) {
-                        g.drawString(model2.getValueAt(i, j).toString(), x + j * 50, y);
-                    }
-                    y += 15;
-                }
-
-                return PAGE_EXISTS;
-            }
-        });
-
-        boolean doPrint = job.printDialog();
-        if (doPrint) {
-            try {
-                job.print();
-            } catch (PrinterException e) {
+            } catch (SQLException e) {
                 e.printStackTrace();
             }
+
+            // Add the table to the document
+            document.add(table);
+
+            // Close the document to save the PDF
+            document.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();  // Handle the file not found exception
+        } catch (DocumentException e) {
+            e.printStackTrace();  // Handle any document generation exceptions
         }
     }
+
+    
+
+
 
     private void printExpenses() {
         // Code to print expenses

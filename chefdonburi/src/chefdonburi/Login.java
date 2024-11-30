@@ -223,10 +223,6 @@ public class Login implements ActionListener {
             JOptionPane.showMessageDialog(frmLogin, "Error closing resources: " + e.getMessage());
         }
     }
-
-    public static void main(String[] args) {
-        new Login().init();
-    }
 }
 
 
