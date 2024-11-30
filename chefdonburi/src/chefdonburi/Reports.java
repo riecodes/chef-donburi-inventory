@@ -10,7 +10,11 @@ import com.lowagie.text.Paragraph;
 import com.lowagie.text.Document;
 import com.lowagie.text.Cell;
 import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
+
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -76,102 +80,121 @@ public class Reports {
         btnPrintInventory.addActionListener(e -> generateInventoryReport());
         btnPrintExpenses.addActionListener(e -> printExpenses());
     }
-    
+
     private void generateInventoryReport() {
-        // Create a new document
-        Document document = new Document();
-    
-        // Declare FileNotFoundException within try-catch block
+        // Create a new document with landscape orientation and A4 paper size (Long size)
+        Document document = new Document(com.lowagie.text.PageSize.A4.rotate());
+
         try {
-            // Create a PDF writer to write to a file
-            PdfWriter.getInstance(document, new FileOutputStream("inventory_report.pdf"));
+            String outputFilePath = "src/chefdonburi/inventory_report.pdf";
+        
+            // Create a PDF writer to write to the file
+            PdfWriter.getInstance(document, new FileOutputStream(outputFilePath));
             
             // Open the document to start writing
             document.open();
-    
+
             // Add title to the document
-            document.add(new Paragraph("Inventory Report", new Font(Font.HELVETICA, 16, Font.BOLD)));
-            document.add(new Paragraph("Generated on: " + java.time.LocalDate.now(), new Font(Font.HELVETICA, 10, Font.ITALIC)));
-            document.add(new Paragraph("\n"));
-    
+            // add this CHEF DONBURI – FOOD DELIVERY SERVICES											
+            PdfPTable headerTable = new PdfPTable(2);
+            headerTable.setWidthPercentage(100);
+            headerTable.setWidths(new float[]{70, 30});
+
+            PdfPCell cell1 = new PdfPCell(new Phrase("CHEF DONBURI – FOOD DELIVERY SERVICES", new Font(Font.HELVETICA, 16, Font.BOLD)));
+            cell1.setBorder(PdfPCell.NO_BORDER);
+            cell1.setHorizontalAlignment(Element.ALIGN_LEFT);
+
+            PdfPCell cell2 = new PdfPCell(new Phrase("DATE: _________________", new Font(Font.HELVETICA, 13, Font.ITALIC)));
+            cell2.setBorder(PdfPCell.NO_BORDER);
+            cell2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+
+            headerTable.addCell(cell1);
+            headerTable.addCell(cell2);
+
+            document.add(headerTable);
+            document.add(new Phrase("\n"));
+
             // SQL query to fetch inventory data
-            String query = "SELECT * FROM inventory ORDER BY CATEGORY, ITEM";
-    
-            // Create a table with 8 columns (including Scrap and Spoilage)
-            PdfPTable table = new PdfPTable(8);  // 8 columns: Category, Item, Unit, Price, Quantity In, Quantity Out, Scrap, Spoilage, Actual
-            table.setWidthPercentage(100);  // Table takes up the full width of the page
-    
-            // Add table headers (based on your structure)
-            table.addCell("ITEM");
-            table.addCell("UNIT");
-            table.addCell("PRICE");
-            table.addCell("IN");
-            table.addCell("OUT");
-            table.addCell("SCRAP");
-            table.addCell("SPOILAGE");
-            table.addCell("ACTUAL");
-    
-            // Initialize category tracking
-            String currentCategory = null;
-    
+            String query = "SELECT * FROM inventory ORDER BY CATEGORY, ITEMS";
+            
             try (Connection connection = new Database().getConnection()) {
                 Statement stmt = connection.createStatement();
                 ResultSet rs = stmt.executeQuery(query);
                 
-                // Loop through the result set and add rows grouped by category
+                // Create a table with 8 columns (removed category column)
+                PdfPTable table = new PdfPTable(9);
+                table.setWidthPercentage(100); // Set table width
+
+                // Define column widths (adjust as necessary)
+                table.setWidths(new float[] {3, 2, 2, 2, 2, 2, 2, 2, 2}); // Adjust column widths here
+                
+                // Add table headers
+                table.addCell("ITEM");
+                table.addCell("UNIT");
+                table.addCell("PRICE");
+                table.addCell("BEGINNING");
+                table.addCell("IN");
+                table.addCell("OUT");
+                table.addCell("SCRAP");
+                table.addCell("SPOILAGE");
+                table.addCell("ACTUAL");
+
+                String currentCategory = "";
+
+                // Loop through the result set and add each row to the table
                 while (rs.next()) {
                     String category = rs.getString("CATEGORY");
-    
-                    // Check if the category has changed
-                    if (currentCategory == null || !currentCategory.equals(category)) {
-                        // Add a merged cell for the category header
-                        if (currentCategory != null) {
-                            document.add(new Paragraph("\n"));  // Add a blank line before the next category
-                        }
-                        
-                        // Add the category name as a centered header
-                        Paragraph categoryHeader = new Paragraph(category, new Font(Font.HELVETICA, 12, Font.BOLD));
-                        categoryHeader.setAlignment(Paragraph.ALIGN_CENTER);
-                        document.add(categoryHeader);
-                        
-                        // Update the current category
-                        currentCategory = category;
-                    }
-    
-                    // Fetch data for each item under the current category
                     String item = rs.getString("ITEMS");
                     String unit = rs.getString("UNIT");
                     String price = rs.getString("PRICE");
+                    String beginning = rs.getString("BEGINNING");
                     String quantityIn = rs.getString("QUANTITY_IN");
                     String quantityOut = rs.getString("QUANTITY_OUT");
-                    String scrap = rs.getString("SCRAP");  // Scrap value
-                    String spoilage = rs.getString("SPOILAGE");  // Spoilage value
+                    String scrap = rs.getString("SCRAP");
+                    String spoilage = rs.getString("SPOILAGE");
                     String actual = rs.getString("ACTUAL");
-    
-                    // Add a row for the item
+
+                    // Add category header when category changes
+                    if (!category.equals(currentCategory)) {
+                        // Add a row with the category name in bold, spanning all columns
+                        PdfPCell categoryCell = new PdfPCell(new Phrase(category, new Font(Font.HELVETICA, 12, Font.BOLD)));
+                        categoryCell.setColspan(9); // Span across all columns
+                        categoryCell.setHorizontalAlignment(PdfPCell.ALIGN_CENTER);
+                        categoryCell.setBackgroundColor(Color.LIGHT_GRAY); // Set background color
+                        table.addCell(categoryCell);
+
+                        // Update current category
+                        currentCategory = category;
+                    }
+
+                    // Add each item and its details to the table
                     table.addCell(item);
                     table.addCell(unit);
                     table.addCell(price);
+                    table.addCell(beginning);
                     table.addCell(quantityIn);
                     table.addCell(quantityOut);
-                    table.addCell(scrap);  // Scrap value
-                    table.addCell(spoilage);  // Spoilage value
+                    table.addCell(scrap);
+                    table.addCell(spoilage);
                     table.addCell(actual);
                 }
+
+                // Add the table to the document
+                document.add(table);
+
             } catch (SQLException e) {
                 e.printStackTrace();
             }
-    
-            // Add the table to the document
-            document.add(table);
-    
+
             // Close the document to save the PDF
             document.close();
         } catch (FileNotFoundException | DocumentException e) {
-            e.printStackTrace();  // Handle file or document exceptions
+            e.printStackTrace(); // Handle exceptions
         }
     }
-      
+    
+
+    
 
 
 
@@ -179,13 +202,4 @@ public class Reports {
         // Code to print expenses
     }
 
-    private void closeConnections() {
-        try {
-            if (rs != null) rs.close();
-            if (ps != null) ps.close();
-            if (connection != null) connection.close();
-        } catch (SQLException e) {
-            JOptionPane.showMessageDialog(frame, "Error closing database connection: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
 }
