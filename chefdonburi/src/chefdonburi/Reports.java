@@ -76,11 +76,11 @@ public class Reports {
         btnPrintInventory.addActionListener(e -> generateInventoryReport());
         btnPrintExpenses.addActionListener(e -> printExpenses());
     }
-
+    
     private void generateInventoryReport() {
         // Create a new document
         Document document = new Document();
-
+    
         // Declare FileNotFoundException within try-catch block
         try {
             // Create a PDF writer to write to a file
@@ -88,66 +88,90 @@ public class Reports {
             
             // Open the document to start writing
             document.open();
-
+    
             // Add title to the document
             document.add(new Paragraph("Inventory Report", new Font(Font.HELVETICA, 16, Font.BOLD)));
             document.add(new Paragraph("Generated on: " + java.time.LocalDate.now(), new Font(Font.HELVETICA, 10, Font.ITALIC)));
             document.add(new Paragraph("\n"));
-
-            // Create a table with 7 columns (based on your inventory table structure)
-            PdfPTable table = new PdfPTable(7);  // 7 columns for: Category, Item, Unit, Price, Quantity In, Quantity Out, Actual
-
-            // Add table headers
-            table.addCell("Category");
-            table.addCell("Item");
-            table.addCell("Unit");
-            table.addCell("Price");
-            table.addCell("Quantity In");
-            table.addCell("Quantity Out");
-            table.addCell("Actual");
-
+    
             // SQL query to fetch inventory data
-            String query = "SELECT * FROM inventory";
-            
+            String query = "SELECT * FROM inventory ORDER BY CATEGORY, ITEM";
+    
+            // Create a table with 8 columns (including Scrap and Spoilage)
+            PdfPTable table = new PdfPTable(8);  // 8 columns: Category, Item, Unit, Price, Quantity In, Quantity Out, Scrap, Spoilage, Actual
+            table.setWidthPercentage(100);  // Table takes up the full width of the page
+    
+            // Add table headers (based on your structure)
+            table.addCell("ITEM");
+            table.addCell("UNIT");
+            table.addCell("PRICE");
+            table.addCell("IN");
+            table.addCell("OUT");
+            table.addCell("SCRAP");
+            table.addCell("SPOILAGE");
+            table.addCell("ACTUAL");
+    
+            // Initialize category tracking
+            String currentCategory = null;
+    
             try (Connection connection = new Database().getConnection()) {
-                Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(query);
-                // Loop through the result set and add each row to the table
+                Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery(query);
+                
+                // Loop through the result set and add rows grouped by category
                 while (rs.next()) {
-                    // Fetching data from each column
                     String category = rs.getString("CATEGORY");
+    
+                    // Check if the category has changed
+                    if (currentCategory == null || !currentCategory.equals(category)) {
+                        // Add a merged cell for the category header
+                        if (currentCategory != null) {
+                            document.add(new Paragraph("\n"));  // Add a blank line before the next category
+                        }
+                        
+                        // Add the category name as a centered header
+                        Paragraph categoryHeader = new Paragraph(category, new Font(Font.HELVETICA, 12, Font.BOLD));
+                        categoryHeader.setAlignment(Paragraph.ALIGN_CENTER);
+                        document.add(categoryHeader);
+                        
+                        // Update the current category
+                        currentCategory = category;
+                    }
+    
+                    // Fetch data for each item under the current category
                     String item = rs.getString("ITEMS");
                     String unit = rs.getString("UNIT");
-                    String price = rs.getString("PRICE");  // As string, to avoid conversion error
-                    String quantityIn = rs.getString("QUANTITY_IN");  // As string, in case it's mixed with text like 'kg'
-                    String quantityOut = rs.getString("QUANTITY_OUT");  // As string
-                    String actual = rs.getString("ACTUAL");  // As string
-
-                    // Add each column value to the table
-                    table.addCell(category);
+                    String price = rs.getString("PRICE");
+                    String quantityIn = rs.getString("QUANTITY_IN");
+                    String quantityOut = rs.getString("QUANTITY_OUT");
+                    String scrap = rs.getString("SCRAP");  // Scrap value
+                    String spoilage = rs.getString("SPOILAGE");  // Spoilage value
+                    String actual = rs.getString("ACTUAL");
+    
+                    // Add a row for the item
                     table.addCell(item);
                     table.addCell(unit);
-                    table.addCell(price);  // No formatting needed
-                    table.addCell(quantityIn);  // No formatting needed
-                    table.addCell(quantityOut);  // No formatting needed
-                    table.addCell(actual);  // No formatting needed
+                    table.addCell(price);
+                    table.addCell(quantityIn);
+                    table.addCell(quantityOut);
+                    table.addCell(scrap);  // Scrap value
+                    table.addCell(spoilage);  // Spoilage value
+                    table.addCell(actual);
                 }
             } catch (SQLException e) {
                 e.printStackTrace();
             }
-
+    
             // Add the table to the document
             document.add(table);
-
+    
             // Close the document to save the PDF
             document.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();  // Handle the file not found exception
-        } catch (DocumentException e) {
-            e.printStackTrace();  // Handle any document generation exceptions
+        } catch (FileNotFoundException | DocumentException e) {
+            e.printStackTrace();  // Handle file or document exceptions
         }
     }
-
-    
+      
 
 
 
