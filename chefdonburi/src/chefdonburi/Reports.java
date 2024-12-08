@@ -31,14 +31,16 @@ import java.util.Date;
 
 
 public class Reports {
+    private double totalPrice;
 
-   JFrame frame;
-   JButton btnPrintInventory, btnPrintExpenses;
-   Connection connection;
-   PreparedStatement ps;
-   ResultSet rs;
+    JFrame frame;
+    JButton btnPrintInventory, btnPrintExpenses;
+    Connection connection;
+    PreparedStatement ps;
+    ResultSet rs;
 
     public Reports() {
+        this.totalPrice = totalPrice;
         init();
     }
 
@@ -290,7 +292,9 @@ private void generateInventoryReport() {
     }
 }
 
-
+public void setTotalPrice(double totalPrice) {
+    this.totalPrice = totalPrice;
+}
 
 private void generateExpensesReport() {
     Document document = new Document(com.lowagie.text.PageSize.A4.rotate()); // Landscape orientation
@@ -384,12 +388,21 @@ private void generateExpensesReport() {
 
             // Add the table to the document
             document.add(table);
-
+            
+            PdfPCell totalCell = new PdfPCell(new Phrase("TOTAL PRICE: " + totalPrice, new Font(Font.HELVETICA, 13, Font.ITALIC)));
+            dateCell.setBorder(PdfPCell.NO_BORDER);
+            dateCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            
+            document.add(totalCell);
+            
         } catch (SQLException e) {
             System.err.println("Error fetching data: " + e.getMessage());
             e.printStackTrace();
         }
-
+        
+        // Add some space
+        document.add(new Phrase("\n"));
+        
         // Close the document and finalize the PDF
         document.close();
         System.out.println("Report generated successfully.");
