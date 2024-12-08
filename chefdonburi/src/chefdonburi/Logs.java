@@ -1,5 +1,6 @@
 package chefdonburi;
 
+import Database.Database;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -40,7 +41,7 @@ public class Logs {
 
     private void init() {
         // Set up frame icon
-        ImageIcon frameicon = new ImageIcon("C:\\Users\\geramy\\Downloads\\images-20241029T152348Z-001\\images\\logochef.png");
+        ImageIcon frameicon = new ImageIcon("src\\images\\jframeicon.jpg");
         Image jframe = frameicon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
         frame = new JFrame("User Activity Logs");
         frame.setIconImage(jframe);

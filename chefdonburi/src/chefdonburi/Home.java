@@ -1,5 +1,6 @@
 package chefdonburi;
 
+import Database.Database;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -68,8 +69,8 @@ public final class Home implements ActionListener {
     public void init() {
         frmHome = new JFrame("Chef Donburi Home");
         ImageIcon frameicon = new ImageIcon("src\\Images\\jframeicon.jpg");
-        Image frame = frameicon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
-        frmHome.setIconImage(frame);
+        Image jframe = frameicon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
+        frmHome.setIconImage(jframe);
         frmHome.setSize(1266, 668);
         frmHome.setLocationRelativeTo(null);
         frmHome.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE); // Prevent closing immediately
@@ -191,7 +192,7 @@ public final class Home implements ActionListener {
         pnlHome.add(btnLogout);
 
         // Create the table to display alerts
-        String[] columns = { "Item ID", "Category", "Item Name", "Actual"};
+        String[] columns = { "Item ID", "Category", "Item Name", "Ending"};
         model = new DefaultTableModel(columns, 0); // Initialize table with no data
         table = new JTable(model);
 
@@ -277,9 +278,10 @@ public final class Home implements ActionListener {
     }
 
     private void logUserLogout() {
-        try (Connection connection = new Database().getConnection()) {
+        try {
+            connection = new Database().getConnection();
             String query = "UPDATE logs SET logoutTime = NOW() WHERE userID = ? AND logoutTime IS NULL";
-            PreparedStatement ps = connection.prepareStatement(query);
+            ps = connection.prepareStatement(query);
             ps.setInt(1, userID); // Set the userID
             int result = ps.executeUpdate();
             if (result > 0) {
@@ -292,18 +294,19 @@ public final class Home implements ActionListener {
         }
     }
 
-// Load the alerts from the database
 private void loadAlerts(DefaultTableModel model) {
     model.setRowCount(0); // Clear existing rows
 
     try {
-        connection = new Database().getConnection();  // Assume Database is a class that handles DB connection
+        connection = new Database().getConnection(); // Assume Database is a class that handles DB connection
 
-        // Query to check inventory for items that are below the threshold (less than or equal to 5kg or 5pcs)
+        // Query to check inventory from both tables for items below thresholds
         String inventoryQuery = """
             SELECT inventory.ID, inventory.CATEGORY, inventory.ITEMS, inventory.ACTUAL
             FROM inventory
-            WHERE CAST(REGEXP_REPLACE(inventory.ACTUAL, '[^0-9.]', '') AS DOUBLE) <= 5
+            UNION ALL
+            SELECT inventory2.ID, inventory2.CATEGORY, inventory2.ITEMS, inventory2.ACTUAL
+            FROM inventory2
         """;
 
         ps = connection.prepareStatement(inventoryQuery);
@@ -315,16 +318,25 @@ private void loadAlerts(DefaultTableModel model) {
             String category = rs.getString("CATEGORY");
             String actualStr = rs.getString("ACTUAL");
 
-            // Remove any non-numeric characters (except dot)
-            double actual = 0;
+            // Extract numeric value and unit
+            double actual;
+            String unit = "";
             try {
                 actual = Double.parseDouble(actualStr.replaceAll("[^0-9.]", ""));
+                unit = actualStr.replaceAll("[0-9.\\s]", "").trim().toLowerCase();
             } catch (NumberFormatException e) {
                 actual = 0;
             }
 
-            // Only insert into alerts if the actual value is less than or equal to 5 and the alert doesn't already exist
-            if (actual <= 5) {
+            // Check thresholds based on unit
+            boolean belowThreshold = switch (unit) {
+                case "kg" -> actual <= 3;
+                case "pcs" -> actual <= 20;
+                case "" -> actual <= 20; // For unknown or no unit
+                default -> false; // Ignore other units
+            };
+
+            if (belowThreshold) {
                 // Check if the alert for this item already exists
                 String checkAlertQuery = """
                     SELECT COUNT(*) FROM alerts WHERE itemID = ?
@@ -347,8 +359,6 @@ private void loadAlerts(DefaultTableModel model) {
                             insertPs.setString(3, itemName); // Insert the correct itemName
                             insertPs.setDouble(4, actual);
                             insertPs.executeUpdate();
-                        } catch (SQLException e) {
-                            e.printStackTrace();
                         }
                     }
                 }
@@ -358,7 +368,7 @@ private void loadAlerts(DefaultTableModel model) {
                     itemID,         // Item ID
                     category,       // Category
                     itemName,       // Item Name
-                    actual          // Actual value
+                    actualStr       // Actual value with unit
                 });
             }
         }

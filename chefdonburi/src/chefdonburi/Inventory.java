@@ -1,5 +1,6 @@
 package chefdonburi;
 
+import Database.Database;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -17,7 +18,7 @@ public final class Inventory implements ActionListener {
     private JFrame frmInventoryManagement;
     private JTable inventoryTable, inventory2Table;
     private DefaultTableModel model, model2;
-    private JButton btnAdd, btnEdit, btnDelete, btnRefresh, btnAdd2, btnEdit2, btnDelete2, btnRefresh2, btnNextDay, btnAllNextDay, btnNextDay2, btnAllNextDay2;
+    private JButton btnAdd, btnEdit, btnDelete, btnRefresh, btnAdd2, btnEdit2, btnDelete2, btnNextDay, btnAllNextDay, btnNextDay2, btnAllNextDay2;
     private JLabel lblDate, lblSearch;
     private JTextField txtSearch;
     private JComboBox<String> categoryComboBox;
@@ -29,8 +30,8 @@ public final class Inventory implements ActionListener {
 
 
     // User ID (Passed from the Login class)
-    private int userID; // User ID to track who last edited the inventory
-
+    private final int userID; // User ID to track who last edited the inventory
+     
     public Inventory(int userID) {
         this.userID = userID;
         init();
@@ -122,7 +123,7 @@ void init() {
     inventoryPanel.add(btnPanel, BorderLayout.SOUTH);
 
     // Inventory2 Table
-    model2 = new DefaultTableModel(new String[]{"ID", "Category", "Item", "Price", "SF", "Beginning", "In", "Out", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
+    model2 = new DefaultTableModel(new String[]{"ID", "Category", "Items", "Price", "SF", "Beginning", "In", "Out", "Spoilage", "Ending", "LastEditedBy", "LastEditedOn"}, 0);
     inventory2Table = new JTable(model2);
     inventory2Table.setRowHeight(30);
 
@@ -144,7 +145,7 @@ void init() {
     btnAdd2 = createButton("Add Item2", btnPanel2);
     btnEdit2 = createButton("Edit Item2", btnPanel2);
     btnDelete2 = createButton("Delete Item2", btnPanel2);
-    btnRefresh2 = createButton("Refresh2", btnPanel2);
+   
 
     btnNextDay2 = createButton("NextDay2", btnPanel2);
     btnNextDay2.addActionListener(e -> carryOverEndingStock2(inventory2Table, model2, "inventory2"));
@@ -240,7 +241,7 @@ void init() {
 
         model2.setRowCount(0);
         try {
-            String query2 = "SELECT * FROM inventory2 WHERE (ITEM LIKE ? OR CATEGORY LIKE ?)";
+            String query2 = "SELECT * FROM inventory2 WHERE (ITEMS LIKE ? OR CATEGORY LIKE ?)";
             if (!selectedCategory.equals("All")) query2 += " AND CATEGORY = ?";
             ps = connection.prepareStatement(query2);
             ps.setString(1, "%" + searchText + "%");
@@ -252,7 +253,7 @@ void init() {
                 model2.addRow(new Object[]{
                         rs.getInt("ID"),
                         rs.getString("CATEGORY"),
-                        rs.getString("ITEM"),
+                        rs.getString("ITEMS"),
                         rs.getDouble("PRICE"),
                         rs.getDouble("SF"),
                         rs.getString("BEGINNING"),
@@ -343,7 +344,7 @@ void init() {
             model2.addRow(new Object[]{
                 rs.getInt("ID"),
                 rs.getString("CATEGORY"),
-                rs.getString("ITEM"),
+                rs.getString("ITEMS"),
                 rs.getDouble("PRICE"),
                 rs.getDouble("SF"),
                 rs.getString("BEGINNING"),
@@ -516,6 +517,12 @@ private void addItem() {
     JTextField txtActual = new JTextField();
     txtActual.setEditable(false); // Make ending stock read-only
 
+    // Add error label to show validation messages
+    JLabel lblError = new JLabel();
+    lblError.setForeground(Color.RED);
+    lblError.setFont(new Font("Arial", Font.BOLD, 18));
+    lblError.setSize(500, 25);
+
     Object[] message = {
         "Category:", categoryCombobox,
         "Item:", txtItem,
@@ -526,7 +533,8 @@ private void addItem() {
         "Quantity Out:", txtOut,
         "Scrap:", txtScrap,
         "Spoilage:", txtSpoilage,
-        "Ending (calculated):", txtActual
+        "Ending (calculated):", txtActual,
+        lblError // Add the error label to the message array
     };
 
     boolean isInputValid;
@@ -535,8 +543,14 @@ private void addItem() {
         int option = JOptionPane.showConfirmDialog(frmInventoryManagement, message, "Add New Item", JOptionPane.OK_CANCEL_OPTION);
 
         if (option == JOptionPane.OK_OPTION) {
-            if (txtItem.getText().trim().isEmpty()) {
-                JOptionPane.showMessageDialog(frmInventoryManagement, "Item name is required!", "Error", JOptionPane.ERROR_MESSAGE);
+            lblError.setText(""); // Clear any previous error message
+
+            String itemName = txtItem.getText().trim();
+            String unit = txtUnit.getText().trim().toLowerCase();
+
+            // Combine Item and Unit validation into a single check
+            if (itemName.isEmpty() || unit.isEmpty()) {
+                lblError.setText("Item name and Unit are required!");
                 isInputValid = false;
                 continue;
             }
@@ -547,42 +561,41 @@ private void addItem() {
                 if (!priceText.isEmpty()) {
                     price = Double.parseDouble(priceText);
                     if (price <= 0) {
-                        JOptionPane.showMessageDialog(frmInventoryManagement, "Please enter a positive price.", "Error", JOptionPane.ERROR_MESSAGE);
+                        lblError.setText("Please enter a positive price.");
                         isInputValid = false;
                         continue;
                     }
                 }
             } catch (NumberFormatException e) {
-                JOptionPane.showMessageDialog(frmInventoryManagement, "Invalid number format for price.", "Error", JOptionPane.ERROR_MESSAGE);
+                lblError.setText("Invalid number format for price.");
                 isInputValid = false;
                 continue;
             }
 
-            double beginning = parseQuantity(txtBeginning.getText(), "Beginning");
-            double in = parseQuantity(txtIn.getText(), "Quantity In");
-            double out = parseQuantity(txtOut.getText(), "Quantity Out");
-            double scrap = parseQuantity(txtScrap.getText(), "Scrap");
-            double spoilage = parseQuantity(txtSpoilage.getText(), "Spoilage");
+            double beginning = parseQuantity(txtBeginning.getText(), "Beginning", lblError);
+            double in = parseQuantity(txtIn.getText(), "Quantity In", lblError);
+            double out = parseQuantity(txtOut.getText(), "Quantity Out", lblError);
+            double scrap = parseQuantity(txtScrap.getText(), "Scrap", lblError);
+            double spoilage = parseQuantity(txtSpoilage.getText(), "Spoilage", lblError);
 
             double totalAvailable = beginning + in;
             if (out + scrap + spoilage > totalAvailable) {
-                JOptionPane.showMessageDialog(frmInventoryManagement, "Out, Scrap, and Spoilage cannot exceed Beginning + Quantity In.", "Error", JOptionPane.ERROR_MESSAGE);
+                lblError.setText("Out, Scrap, and Spoilage cannot exceed Beginning + Quantity In.");
                 isInputValid = false;
                 continue;
             }
 
             double ending = totalAvailable - out - scrap - spoilage;
-            String unit = txtUnit.getText().trim().toLowerCase();
             String endingWithUnit = formatEndingWithUnit(ending, unit);
             txtActual.setText(endingWithUnit);
 
             if (isInputValid) {
                 try {
                     connection = new Database().getConnection();
-                    String query = "INSERT INTO inventory (CATEGORY, ITEMS, UNIT, PRICE, BEGINNING, QUANTITY_IN, QUANTITY_OUT, SCRAP, SPOILAGE, ACTUAL) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    String query = "INSERT INTO inventory (CATEGORY, ITEMS, UNIT, PRICE, BEGINNING, QUANTITY_IN, QUANTITY_OUT, SCRAP, SPOILAGE, ACTUAL, LAST_EDITED_BY) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                     ps = connection.prepareStatement(query);
                     ps.setString(1, (String) categoryCombobox.getSelectedItem());
-                    ps.setString(2, txtItem.getText().trim());
+                    ps.setString(2, itemName);
                     ps.setString(3, unit);
                     ps.setDouble(4, price);
                     ps.setDouble(5, beginning);
@@ -591,12 +604,16 @@ private void addItem() {
                     ps.setDouble(8, scrap);
                     ps.setDouble(9, spoilage);
                     ps.setString(10, endingWithUnit);
+                    ps.setInt(11, userID); // Set the user ID for "Last Edited By"
 
                     ps.executeUpdate();
-                    JOptionPane.showMessageDialog(frmInventoryManagement, "Item added successfully!");
+                    JOptionPane.showMessageDialog(frmInventoryManagement, "Item added to Inventory successfully!");
+                    int itemId = 0; // You can assign the itemId if needed
+                    logInventory(userID, itemId);
                     loadInventoryTable();
+                    return; // Exit after successful update
                 } catch (SQLException e) {
-                    JOptionPane.showMessageDialog(frmInventoryManagement, "Error adding item: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    lblError.setText("Error adding item: " + e.getMessage());
                 } finally {
                     closeConnections();
                 }
@@ -607,159 +624,185 @@ private void addItem() {
     } while (!isInputValid);
 }
 
-    // Method to add item to inventory2Table
-    private void addItem2() {
-        String[] categories = {"Frozen Goods", "Sushi", "Vegetables", "Rice", "Dry Ingredients", "Dairy", "Wrapper", "Noodles", "Sauce", "Condiments", "Fruits", "Others", "Essentials"};
-        JComboBox<String> categoryCombobox = new JComboBox<>(categories);
 
-        JTextField txtItem = new JTextField();
-        JTextField txtPrice = new JTextField();
-        JTextField txtSF = new JTextField(); // SF (Stock Factor or similar)
-        JTextField txtBeginning = new JTextField();
-        JTextField txtIn = new JTextField();
-        JTextField txtOut = new JTextField();
-        JTextField txtSpoilage = new JTextField();
-        JTextField txtActual = new JTextField();
-        txtActual.setEditable(false); // Make ending stock read-only
 
-        Object[] message = {
-            "Category:", categoryCombobox,
-            "Item:", txtItem,
-            "Price:", txtPrice,
-            "SF:", txtSF,
-            "Beginning:", txtBeginning,
-            "Quantity In:", txtIn,
-            "Quantity Out:", txtOut,
-            "Spoilage:", txtSpoilage,
-            "Ending (calculated):", txtActual
-        };
+private void addItem2() {
+    String[] categories = {"Essentials"};
+    JComboBox<String> categoryCombobox = new JComboBox<>(categories);
 
-        boolean isInputValid;
-        do {
-            isInputValid = true;
-            int option = JOptionPane.showConfirmDialog(frmInventoryManagement, message, "Add New Item to Inventory2", JOptionPane.OK_CANCEL_OPTION);
+    JTextField txtItem = new JTextField();
+    JTextField txtPrice = new JTextField();
+    JTextField txtSF = new JTextField(); // SF (Stock Factor or similar)
+    JTextField txtBeginning = new JTextField();
+    JTextField txtIn = new JTextField();
+    JTextField txtOut = new JTextField();
+    JTextField txtSpoilage = new JTextField();
+    JTextField txtActual = new JTextField();
+    txtActual.setEditable(false); // Make ending stock read-only
 
-            if (option == JOptionPane.OK_OPTION) {
-                if (txtItem.getText().trim().isEmpty()) {
-                    JOptionPane.showMessageDialog(frmInventoryManagement, "Item name is required!", "Error", JOptionPane.ERROR_MESSAGE);
-                    isInputValid = false;
-                    continue;
-                }
+    // Add error label to show validation messages
+    JLabel lblError = new JLabel();
+    lblError.setForeground(Color.RED);
+    lblError.setFont(new Font("Arial", Font.BOLD, 18));
+    lblError.setSize(500, 25);
 
-                double price = 0.0;
-                double sf = 0.0;
-                try {
-                    String priceText = txtPrice.getText().trim();
-                    if (!priceText.isEmpty()) {
-                        price = Double.parseDouble(priceText);
-                        if (price <= 0) {
-                            JOptionPane.showMessageDialog(frmInventoryManagement, "Please enter a positive price.", "Error", JOptionPane.ERROR_MESSAGE);
-                            isInputValid = false;
-                            continue;
-                        }
-                    }
+    Object[] message = {
+        "Category:", categoryCombobox,
+        "Item:", txtItem,
+        "Price:", txtPrice,
+        "SF:", txtSF,
+        "Beginning:", txtBeginning,
+        "Quantity In:", txtIn,
+        "Quantity Out:", txtOut,
+        "Spoilage:", txtSpoilage,
+        "Ending (calculated):", txtActual,
+        lblError // Add the error label to the message array
+    };
 
-                    String sfText = txtSF.getText().trim();
-                    if (!sfText.isEmpty()) {
-                        sf = Double.parseDouble(sfText);
-                        if (sf <= 0) {
-                            JOptionPane.showMessageDialog(frmInventoryManagement, "Please enter a positive SF value.", "Error", JOptionPane.ERROR_MESSAGE);
-                            isInputValid = false;
-                            continue;
-                        }
-                    }
+    boolean isInputValid;
+    do {
+        isInputValid = true;
+        int option = JOptionPane.showConfirmDialog(frmInventoryManagement, message, "Add New Item to Inventory2", JOptionPane.OK_CANCEL_OPTION);
 
-                } catch (NumberFormatException e) {
-                    JOptionPane.showMessageDialog(frmInventoryManagement, "Invalid number format for price or SF.", "Error", JOptionPane.ERROR_MESSAGE);
-                    isInputValid = false;
-                    continue;
-                }
+        if (option == JOptionPane.OK_OPTION) {
+            lblError.setText(""); // Clear any previous error message
 
-                double beginning = parseQuantity(txtBeginning.getText(), "Beginning");
-                double in = parseQuantity(txtIn.getText(), "Quantity In");
-                double out = parseQuantity(txtOut.getText(), "Quantity Out");
-                double spoilage = parseQuantity(txtSpoilage.getText(), "Spoilage");
+            String itemName = txtItem.getText().trim();
 
-                double totalAvailable = beginning + in;
-                if (out + spoilage > totalAvailable) {
-                    JOptionPane.showMessageDialog(frmInventoryManagement, "Out and Spoilage cannot exceed Beginning + Quantity In.", "Error", JOptionPane.ERROR_MESSAGE);
-                    isInputValid = false;
-                    continue;
-                }
-
-                double ending = totalAvailable - out - spoilage;
-                txtActual.setText(formatEndingWithUnit(ending, "pcs")); // Assuming units are in pieces (adjust if needed)
-
-                if (isInputValid) {
-                    try {
-                        connection = new Database().getConnection();
-                        String query = "INSERT INTO inventory2 (CATEGORY, ITEM, PRICE, SF, BEGINNING, QUANTITY_IN, QUANTITY_OUT, SPOILAGE, ACTUAL) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                        ps = connection.prepareStatement(query);
-                        ps.setString(1, (String) categoryCombobox.getSelectedItem());
-                        ps.setString(2, txtItem.getText().trim());
-                        ps.setDouble(3, price);
-                        ps.setDouble(4, sf);
-                        ps.setDouble(5, beginning);
-                        ps.setDouble(6, in);
-                        ps.setDouble(7, out);
-                        ps.setDouble(8, spoilage);
-                        ps.setDouble(9, ending); // Store the calculated ending value
-
-                        ps.executeUpdate();
-                        JOptionPane.showMessageDialog(frmInventoryManagement, "Item added to Inventory2 successfully!");
-                        loadInventory2Table();
-                    } catch (SQLException e) {
-                        JOptionPane.showMessageDialog(frmInventoryManagement, "Error adding item to Inventory2: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                    } finally {
-                        closeConnections();
-                    }
-                }
-            } else {
-                break;
+            // Validate if item name is empty
+            if (itemName.isEmpty()) {
+                lblError.setText("Item name is required!");
+                isInputValid = false;
+                continue;
             }
-        } while (!isInputValid);
-    }
+
+            double price = 0.0;
+            double sf = 0.0;
+            try {
+                String priceText = txtPrice.getText().trim();
+                if (!priceText.isEmpty()) {
+                    price = Double.parseDouble(priceText);
+                    if (price <= 0) {
+                        lblError.setText("Please enter a positive price.");
+                        isInputValid = false;
+                        continue;
+                    }
+                }
+
+                String sfText = txtSF.getText().trim();
+                if (!sfText.isEmpty()) {
+                    sf = Double.parseDouble(sfText);
+                    if (sf <= 0) {
+                        lblError.setText("Please enter a positive SF value.");
+                        isInputValid = false;
+                        continue;
+                    }
+                }
+            } catch (NumberFormatException e) {
+                lblError.setText("Invalid number format for price or SF.");
+                isInputValid = false;
+                continue;
+            }
+
+            double beginning = parseQuantity(txtBeginning.getText(), "Beginning", lblError);
+            double in = parseQuantity(txtIn.getText(), "Quantity In", lblError);
+            double out = parseQuantity(txtOut.getText(), "Quantity Out", lblError);
+            double spoilage = parseQuantity(txtSpoilage.getText(), "Spoilage", lblError);
+
+            double totalAvailable = beginning + in;
+            if (out + spoilage > totalAvailable) {
+                lblError.setText("Out and Spoilage cannot exceed Beginning + Quantity In.");
+                isInputValid = false;
+                continue;
+            }
+
+            double ending = totalAvailable - out - spoilage;
+            txtActual.setText(formatEndingWithUnit(ending, "pcs")); // Assuming units are in pieces (adjust if needed)
+
+            if (isInputValid) {
+                try {
+                    connection = new Database().getConnection();
+                    String query = "INSERT INTO inventory2 (CATEGORY, ITEMS, PRICE, SF, BEGINNING, QUANTITY_IN, QUANTITY_OUT, SPOILAGE, ACTUAL, LAST_EDITED_BY) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    ps = connection.prepareStatement(query);
+                    ps.setString(1, (String) categoryCombobox.getSelectedItem());
+                    ps.setString(2, itemName);
+                    ps.setDouble(3, price);
+                    ps.setDouble(4, sf);
+                    ps.setDouble(5, beginning);
+                    ps.setDouble(6, in);
+                    ps.setDouble(7, out);
+                    ps.setDouble(8, spoilage);
+                    ps.setDouble(9, ending); // Store the calculated ending value
+                    ps.setInt(10, userID); // Set the user ID for "Last Edited By"
+
+                    ps.executeUpdate();
+                    JOptionPane.showMessageDialog(frmInventoryManagement, "Item added to Inventory2 successfully!");
+                    int itemId = 0; // You can assign the itemId if needed
+                    logInventory2(userID, itemId);
+                    loadInventory2Table();
+                    return; // Exit after successful update
+                } catch (SQLException e) {
+                    lblError.setText("Error adding item to Inventory2: " + e.getMessage());
+                } finally {
+                    closeConnections();
+                }
+            }
+        } else {
+            break;
+        }
+    } while (!isInputValid);
+}
+
+ 
 
 
    
-private double parseQuantity(String text, String fieldName) {
+private double parseQuantity(String text, String fieldName, JLabel lblError) {
     try {
+        // Trim and check if the input is empty
         if (text.trim().isEmpty()) {
-            return 0.0;
+            return 0.0; // Return 0 if input is empty (no need for error message here)
         }
 
-        String numericPart = text.replaceAll("[^0-9.]", "").trim();
-        String unitPart = text.replaceAll("[0-9.]", "").trim().toLowerCase();
+        // Extract numeric and unit parts from the input
+        String numericPart = text.replaceAll("[^0-9.-]", "").trim();  // Allow negative numbers
+        String unitPart = text.replaceAll("[0-9.-]", "").trim().toLowerCase();
 
+        // Parse the numeric part
         double quantity = Double.parseDouble(numericPart);
 
+        // Handle unit conversion (grams to kilograms)
         if (unitPart.equals("g")) {
-            quantity /= 1000.0;
+            quantity /= 1000.0; // Convert grams to kilograms
         } else if (unitPart.equals("kg")) {
-            // Already in kilograms
+            // Already in kilograms, no conversion needed
         } else if (unitPart.equals("pcs")) {
-            // No conversion needed
+            // No conversion needed for pieces
         } else if (!unitPart.isEmpty()) {
-            JOptionPane.showMessageDialog(frmInventoryManagement, "Unsupported unit for " + fieldName + ": " + unitPart, "Error", JOptionPane.ERROR_MESSAGE);
-            throw new IllegalArgumentException("Unsupported unit: " + unitPart);
+            lblError.setText("Unsupported unit for " + fieldName + ": " + unitPart);  // Show error in lblError
+            return 0.0;  // Invalid unit, return 0
         }
 
         return quantity;
     } catch (NumberFormatException e) {
-        JOptionPane.showMessageDialog(frmInventoryManagement, "Invalid number format for " + fieldName, "Error", JOptionPane.ERROR_MESSAGE);
-        throw e;
+        // Handle invalid number format error
+        lblError.setText("Invalid number format for " + fieldName);  // Show error in lblError
+        return 0.0;  // Return 0 in case of invalid input
     }
 }
 
 
+
+
 private String formatEndingWithUnit(double ending, String unit) {
+    // Ensure valid unit and format accordingly
     switch (unit) {
         case "g":
             // Convert grams to kilograms for display if ending weight is less than 1 kg
             double kilograms = ending / 1000.0;
-            // Display in kg with 1 to 3 decimals based on need; e.g., 0.1 kg or 0.123 kg
-            return kilograms < 1.0 
-                ? String.format("%.3f", kilograms).replaceAll("0{1,2}$", "") + " kg" 
+            // Format in kg with 1 to 3 decimals based on need
+            return kilograms < 1.0
+                ? String.format("%.3f", kilograms).replaceAll("0{1,2}$", "") + " kg"
                 : String.format("%.1f kg", kilograms);
 
         case "kg":
@@ -771,10 +814,11 @@ private String formatEndingWithUnit(double ending, String unit) {
             return String.format("%.0f pcs", ending);
 
         default:
-            // Default format with 3 decimals
+            // Default formatting for any unsupported units
             return String.format("%.3f", ending);
     }
 }
+
 
 
 private void editItem() {
@@ -809,9 +853,16 @@ private void editItem() {
     JTextField txtScrap = new JTextField(scrap);
     JTextField txtSpoilage = new JTextField(spoilage);
     JTextField txtActual = new JTextField(actual);
-    txtActual.setEditable(false);
+    txtActual.setEditable(false);  // Ending stock is read-only
 
-    while (true) { // Keep the dialog open if no changes are made
+    // Error label for validation messages
+    JLabel lblError = new JLabel();
+    lblError.setForeground(Color.RED);
+    lblError.setFont(new Font("Arial", Font.BOLD, 18));
+    lblError.setSize(500, 25);
+
+    // Keep the dialog open if no changes are made
+    while (true) {
         Object[] message = {
             "Category:", categoryCombobox,
             "Item:", txtItem,
@@ -822,7 +873,8 @@ private void editItem() {
             "Quantity Out:", txtOut,
             "Scrap:", txtScrap,
             "Spoilage:", txtSpoilage,
-            "Ending (calculated):", txtActual
+            "Ending (calculated):", txtActual,
+            lblError // Add error label to the message
         };
 
         int option = JOptionPane.showConfirmDialog(frmInventoryManagement, message, "Edit Item", JOptionPane.OK_CANCEL_OPTION);
@@ -830,47 +882,80 @@ private void editItem() {
             return; // Exit the method if user cancels
         }
 
+        // Reset error label before validation
+        lblError.setText("");
+
+        boolean isInputValid = true;
+
+        // Validate input fields
+        String itemName = txtItem.getText().trim();
+        String unitText = txtUnit.getText().trim().toLowerCase();
+        if (itemName.isEmpty() || unitText.isEmpty()) {
+            lblError.setText("Item name and Unit are required!");
+            isInputValid = false;
+        }
+
+        double priceValue = 0.0;
         try {
-            double newPrice = Double.parseDouble(txtPrice.getText());
-            double beginningQty = parseQuantity(txtBeginning.getText(), "Beginning");
-            double inQty = parseQuantity(txtIn.getText(), "Quantity In");
-            double outQty = parseQuantity(txtOut.getText(), "Quantity Out");
-            double scrapQty = parseQuantity(txtScrap.getText(), "Scrap");
-            double spoilageQty = parseQuantity(txtSpoilage.getText(), "Spoilage");
-
-            double totalAvailable = beginningQty + inQty;
-            if (outQty + scrapQty + spoilageQty > totalAvailable) {
-                JOptionPane.showMessageDialog(frmInventoryManagement, "Out, Scrap, and Spoilage cannot exceed Beginning + Quantity In.", "Error", JOptionPane.ERROR_MESSAGE);
-                continue; // Keep the dialog open if validation fails
+            String priceText = txtPrice.getText().trim();
+            if (!priceText.isEmpty()) {
+                priceValue = Double.parseDouble(priceText);
+                if (priceValue <= 0) {
+                    lblError.setText("Please enter a positive price.");
+                    isInputValid = false;
+                }
             }
+        } catch (NumberFormatException e) {
+            lblError.setText("Invalid number format for price.");
+            isInputValid = false;
+        }
 
-            double endingQty = totalAvailable - outQty - scrapQty - spoilageQty;
-            String formattedEnding = formatEndingWithUnit(endingQty, txtUnit.getText());
+        // Validate quantities using parseQuantity() method
+        double beginningQty = parseQuantity(txtBeginning.getText(), "Beginning", lblError);
+        double inQty = parseQuantity(txtIn.getText(), "Quantity In", lblError);
+        double outQty = parseQuantity(txtOut.getText(), "Quantity Out", lblError);
+        double scrapQty = parseQuantity(txtScrap.getText(), "Scrap", lblError);
+        double spoilageQty = parseQuantity(txtSpoilage.getText(), "Spoilage", lblError);
 
-            // Check if any changes were made
-            if (category.equals(categoryCombobox.getSelectedItem()) &&
-                item.equals(txtItem.getText()) &&
-                unit.equals(txtUnit.getText()) &&
-                price == newPrice &&
-                Double.parseDouble(beginning) == beginningQty &&
-                Double.parseDouble(quantityIn) == inQty &&
-                Double.parseDouble(quantityOut) == outQty &&
-                Double.parseDouble(scrap) == scrapQty &&
-                Double.parseDouble(spoilage) == spoilageQty &&
-                actual.equals(formattedEnding)) {
+        // Validate total available stock
+        double totalAvailable = beginningQty + inQty;
+        if (outQty + scrapQty + spoilageQty > totalAvailable) {
+            lblError.setText("Out, Scrap, and Spoilage cannot exceed Beginning + Quantity In.");
+            isInputValid = false;
+        }
 
-                JOptionPane.showMessageDialog(frmInventoryManagement, "No changes were made.", "No Changes", JOptionPane.INFORMATION_MESSAGE);
-                continue; // Keep the dialog open after showing the message
-            }
+        double endingQty = totalAvailable - outQty - scrapQty - spoilageQty;
+        String formattedEnding = formatEndingWithUnit(endingQty, txtUnit.getText());
 
-            // Update the database
+        if (!isInputValid) {
+            continue; // Keep the dialog open if there are validation errors
+        }
+
+        // Check if any changes were made
+        if (category.equals(categoryCombobox.getSelectedItem()) &&
+            item.equals(txtItem.getText()) &&
+            unit.equals(txtUnit.getText()) &&
+            price == priceValue &&
+            Double.parseDouble(beginning) == beginningQty &&
+            Double.parseDouble(quantityIn) == inQty &&
+            Double.parseDouble(quantityOut) == outQty &&
+            Double.parseDouble(scrap) == scrapQty &&
+            Double.parseDouble(spoilage) == spoilageQty &&
+            actual.equals(formattedEnding)) {
+
+            lblError.setText("No changes were made");
+            continue; // Keep the dialog open after showing the message
+        }
+
+        // Update the database
+        try {
             connection = new Database().getConnection();
             String query = "UPDATE inventory SET CATEGORY = ?, ITEMS = ?, UNIT = ?, PRICE = ?, BEGINNING = ?, QUANTITY_IN = ?, QUANTITY_OUT = ?, SCRAP = ?, SPOILAGE = ?, ACTUAL = ? WHERE ID = ?";
             ps = connection.prepareStatement(query);
             ps.setString(1, (String) categoryCombobox.getSelectedItem());
             ps.setString(2, txtItem.getText());
             ps.setString(3, txtUnit.getText());
-            ps.setDouble(4, newPrice);
+            ps.setDouble(4, priceValue);
             ps.setDouble(5, beginningQty);
             ps.setDouble(6, inQty);
             ps.setDouble(7, outQty);
@@ -894,8 +979,10 @@ private void editItem() {
     }
 }
 
+
+
 private void logInventory(int userID, int itemId) {
-    PreparedStatement ps = null;
+    
     try {
         // Query to update the inventory table with LAST_EDITED_BY and LAST_EDITED_ON
         String query = "UPDATE inventory SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
@@ -915,7 +1002,7 @@ private void logInventory(int userID, int itemId) {
 }
 
 private void logInventory2(int userID, int itemId) {
-    PreparedStatement ps = null;
+    
     try {
         // Query to update the inventory table with LAST_EDITED_BY and LAST_EDITED_ON
         String query = "UPDATE inventory2 SET LAST_EDITED_BY = ?, LAST_EDITED_ON = NOW() WHERE ID = ?";
@@ -954,7 +1041,8 @@ private void editItem2() {
     String spoilage = (String) model2.getValueAt(selectedRow, 8);
     String actual = (String) model2.getValueAt(selectedRow, 9);
 
-    JComboBox<String> categoryCombobox = new JComboBox<>(new String[]{"Frozen Goods", "Sushi", "Vegetables", "Rice", "Dry Ingredients", "Dairy", "Wrapper", "Noodles", "Sauce", "Condiments", "Fruits", "Others", "Essentials"});
+    // Category combobox restricted to 'Essentials'
+    JComboBox<String> categoryCombobox = new JComboBox<>(new String[]{"Essentials"});
     categoryCombobox.setSelectedItem(category);
 
     JTextField txtItem = new JTextField(item);
@@ -966,8 +1054,14 @@ private void editItem2() {
     JTextField txtSpoilage = new JTextField(spoilage);
     JTextField txtActual = new JTextField(actual);
     txtActual.setEditable(false);
+    
+    // Error label for validation messages
+    JLabel lblError = new JLabel();
+    lblError.setForeground(Color.RED);
+    lblError.setFont(new Font("Arial", Font.BOLD, 18));
+    lblError.setSize(500, 25);
 
-    while (true) { // Keep the dialog open if no changes are made
+    while (true) {
         Object[] message = {
             "Category:", categoryCombobox,
             "Item:", txtItem,
@@ -982,44 +1076,47 @@ private void editItem2() {
 
         int option = JOptionPane.showConfirmDialog(frmInventoryManagement, message, "Edit Item in Inventory2", JOptionPane.OK_CANCEL_OPTION);
         if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) {
-            return; // Exit the method if user cancels
+            return; // Exit if user cancels
         }
 
         try {
+            // Parse input values
             double newPrice = Double.parseDouble(txtPrice.getText());
             double newSF = Double.parseDouble(txtSF.getText());
-            double beginningQty = parseQuantity(txtBeginning.getText(), "Beginning");
-            double inQty = parseQuantity(txtIn.getText(), "Quantity In");
-            double outQty = parseQuantity(txtOut.getText(), "Quantity Out");
-            double spoilageQty = parseQuantity(txtSpoilage.getText(), "Spoilage");
+            double beginningQty = parseQuantity(txtBeginning.getText(), "Beginning", lblError);
+            double inQty = parseQuantity(txtIn.getText(), "Quantity In", lblError);
+            double outQty = parseQuantity(txtOut.getText(), "Quantity Out", lblError);
+            double spoilageQty = parseQuantity(txtSpoilage.getText(), "Spoilage", lblError);
 
+            // Total available quantity after beginning + quantity in
             double totalAvailable = beginningQty + inQty;
             if (outQty + spoilageQty > totalAvailable) {
                 JOptionPane.showMessageDialog(frmInventoryManagement, "Out and Spoilage cannot exceed Beginning + Quantity In.", "Error", JOptionPane.ERROR_MESSAGE);
                 continue; // Keep the dialog open if validation fails
             }
 
+            // Calculate ending quantity
             double endingQty = totalAvailable - outQty - spoilageQty;
-            String formattedEnding = String.format("%.2f", endingQty);
+            String formattedEnding = String.format("%.2f", endingQty); // Format to 2 decimal places
 
-            // Check if any changes were made
+            // Check if there are changes to the current item values
             if (category.equals(categoryCombobox.getSelectedItem()) &&
                 item.equals(txtItem.getText()) &&
-                price == newPrice &&
-                sf == newSF &&
-                Double.parseDouble(beginning) == beginningQty &&
-                Double.parseDouble(quantityIn) == inQty &&
-                Double.parseDouble(quantityOut) == outQty &&
-                Double.parseDouble(spoilage) == spoilageQty &&
+                Math.abs(price - newPrice) < 0.0001 &&
+                Math.abs(sf - newSF) < 0.0001 &&
+                Math.abs(Double.parseDouble(beginning) - beginningQty) < 0.0001 &&
+                Math.abs(Double.parseDouble(quantityIn) - inQty) < 0.0001 &&
+                Math.abs(Double.parseDouble(quantityOut) - outQty) < 0.0001 &&
+                Math.abs(Double.parseDouble(spoilage) - spoilageQty) < 0.0001 &&
                 actual.equals(formattedEnding)) {
 
                 JOptionPane.showMessageDialog(frmInventoryManagement, "No changes were made.", "No Changes", JOptionPane.INFORMATION_MESSAGE);
-                continue; // Keep the dialog open after showing the message
+                continue; // Keep the dialog open if no changes
             }
 
             // Update the database
             connection = new Database().getConnection();
-            String query = "UPDATE inventory2 SET CATEGORY = ?, ITEM = ?, PRICE = ?, SF = ?, BEGINNING = ?, QUANTITY_IN = ?, QUANTITY_OUT = ?, SPOILAGE = ?, ACTUAL = ? WHERE ID = ?";
+            String query = "UPDATE inventory2 SET CATEGORY = ?, ITEMS = ?, PRICE = ?, SF = ?, BEGINNING = ?, QUANTITY_IN = ?, QUANTITY_OUT = ?, SPOILAGE = ?, ACTUAL = ? WHERE ID = ?";
             ps = connection.prepareStatement(query);
             ps.setString(1, (String) categoryCombobox.getSelectedItem());
             ps.setString(2, txtItem.getText());
@@ -1034,8 +1131,8 @@ private void editItem2() {
 
             ps.executeUpdate();
             JOptionPane.showMessageDialog(frmInventoryManagement, "Item in Inventory2 updated successfully!");
-            logInventory2(userID, itemId);
-            loadInventory2Table();
+            logInventory2(userID, itemId); // Log the update
+            loadInventory2Table(); // Reload the table
             return; // Exit after successful update
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(frmInventoryManagement, "Error updating item in Inventory2: " + e.getMessage());
@@ -1046,6 +1143,7 @@ private void editItem2() {
         }
     }
 }
+
 
 
 
@@ -1113,7 +1211,5 @@ private void editItem2() {
             JOptionPane.showMessageDialog(frmInventoryManagement, "Error closing connections: " + e.getMessage());
         }
     }
-
 }
-
 

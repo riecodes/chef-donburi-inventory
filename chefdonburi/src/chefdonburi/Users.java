@@ -1,5 +1,6 @@
 package chefdonburi;
 
+import Database.Database;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -30,7 +31,7 @@ public final class Users implements ActionListener {
 
     void init() {
         frmUserManagement = new JFrame("User Management");
-        ImageIcon frameicon = new ImageIcon("C:\\Users\\geramy\\Downloads\\images-20241029T152348Z-001\\images\\logochef.png");
+        ImageIcon frameicon = new ImageIcon("src\\images\\jframeicon.jpg");
         Image frame = frameicon.getImage().getScaledInstance(100, 100, Image.SCALE_SMOOTH);
         frmUserManagement.setIconImage(frame);
         frmUserManagement.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE); // Close only this window
@@ -134,73 +135,91 @@ public final class Users implements ActionListener {
         }
     }
 
-    private void closeConnections() {
+  
+
+private void addUser() {
+    // Define a custom font size
+   
+
+    // Create input fields for user data
+    JTextField txtUserName = new JTextField();
+    JTextField txtFirstName = new JTextField();
+    JTextField txtLastName = new JTextField();
+    JComboBox<String> cmbRole = new JComboBox<>(new String[]{"Admin", "User"});
+    JPasswordField txtPassword = new JPasswordField();
+ 
+    // Create an error label (initially hidden)
+    JLabel errorLabel = new JLabel();
+    errorLabel.setForeground(Color.RED);
+    errorLabel.setFont(new Font("Arial", Font.BOLD, 18)); // Set font for the error label
+    errorLabel.setHorizontalAlignment(SwingConstants.CENTER); // Center the error label
+    errorLabel.setVisible(false); // Initially, the label is hidden
+
+    // Add all fields to a single array for JOptionPane
+    Object[] message = {
+        "Username:", txtUserName,
+        "First Name:", txtFirstName,
+        "Last Name:", txtLastName,
+        "Role:", cmbRole,
+        "Password:", txtPassword,
+         errorLabel // Add error label to message
+    };
+
+    boolean isValid = false; // Flag to track if validation is successful
+
+    while (!isValid) {
+        int option = JOptionPane.showConfirmDialog(frmUserManagement, message, "Add User", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) {
+            return; // Exit the method if Cancel or X is pressed
+        }
+
+        // Reset error label visibility and text
+        errorLabel.setVisible(false);
+        errorLabel.setText("");
+
+        // Validation checks
+        if (txtUserName.getText().trim().isEmpty() ||
+                txtFirstName.getText().trim().isEmpty() ||
+                txtLastName.getText().trim().isEmpty() ||
+                txtPassword.getPassword().length == 0) {
+            errorLabel.setText("All fields are required.");
+            errorLabel.setVisible(true); // Show the error label
+            continue; // Continue the loop and keep the dialog open
+        }
+
+        // Check if the username already exists
+        if (isUsernameTaken(txtUserName.getText())) {
+            errorLabel.setText("This username is already taken.");
+            errorLabel.setVisible(true); // Show the error label
+            continue; // Continue the loop and keep the dialog open
+        }
+
+        // If validation passes, proceed with user creation
+        String hashedPassword = BCrypt.hashpw(new String(txtPassword.getPassword()), BCrypt.gensalt()); // Hash the password
+
         try {
-            if (rs != null) rs.close();
-            if (ps != null) ps.close();
-            if (connection != null) connection.close();
+            connection = new Database().getConnection();
+            String query = "INSERT INTO users (userName, firstname, lastname, role, userPassword) VALUES (?, ?, ?, ?, ?)";
+            ps = connection.prepareStatement(query);
+            ps.setString(1, txtUserName.getText());
+            ps.setString(2, txtFirstName.getText());
+            ps.setString(3, txtLastName.getText());
+            ps.setString(4, cmbRole.getSelectedItem().toString());
+            ps.setString(5, hashedPassword); // Store hashed password
+            ps.executeUpdate();
+            JOptionPane.showMessageDialog(frmUserManagement, "User added successfully.");
+            loadUserTable();
+            isValid = true; // Set flag to exit loop
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(frmUserManagement, "Error closing resources: " + e.getMessage());
+            JOptionPane.showMessageDialog(frmUserManagement, "Error adding user: " + e.getMessage());
+        } finally {
+            closeConnections();
         }
     }
+}
 
-    private void addUser() {
-        JTextField txtUserName = new JTextField();
-        JTextField txtFirstName = new JTextField();
-        JTextField txtLastName = new JTextField();
-        JComboBox<String> cmbRole = new JComboBox<>(new String[]{"Admin", "User"});
-        JPasswordField txtPassword = new JPasswordField();
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(6, 2)); // Keep the form layout simple
-        panel.add(new JLabel("Username:"));
-        panel.add(txtUserName);
-        panel.add(new JLabel("First Name:"));
-        panel.add(txtFirstName);
-        panel.add(new JLabel("Last Name:"));
-        panel.add(txtLastName);
-        panel.add(new JLabel("Role:"));
-        panel.add(cmbRole);
-        panel.add(new JLabel("Password:"));
-        panel.add(txtPassword);
 
-        int option = JOptionPane.showConfirmDialog(frmUserManagement, panel, "Add User", JOptionPane.OK_CANCEL_OPTION);
-        if (option == JOptionPane.OK_OPTION) {
-            if (txtUserName.getText().trim().isEmpty() ||
-                    txtFirstName.getText().trim().isEmpty() ||
-                    txtLastName.getText().trim().isEmpty() ||
-                    txtPassword.getPassword().length == 0) {
-                JOptionPane.showMessageDialog(frmUserManagement, "All fields are required.", "Validation Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            // Check if the username already exists
-            if (isUsernameTaken(txtUserName.getText())) {
-                JOptionPane.showMessageDialog(frmUserManagement, "This username is already taken.", "Validation Error", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-
-            String hashedPassword = BCrypt.hashpw(new String(txtPassword.getPassword()), BCrypt.gensalt()); // Hash the password
-
-            try {
-                connection = new Database().getConnection();
-                String query = "INSERT INTO users (userName, firstName, lastName, role, userPassword) VALUES (?, ?, ?, ?, ?)";
-                ps = connection.prepareStatement(query);
-                ps.setString(1, txtUserName.getText());
-                ps.setString(2, txtFirstName.getText());
-                ps.setString(3, txtLastName.getText());
-                ps.setString(4, cmbRole.getSelectedItem().toString());
-                ps.setString(5, hashedPassword); // Store hashed password
-                ps.executeUpdate();
-                JOptionPane.showMessageDialog(frmUserManagement, "User added successfully.");
-                loadUserTable();
-            } catch (SQLException e) {
-                JOptionPane.showMessageDialog(frmUserManagement, "Error adding user: " + e.getMessage());
-            } finally {
-                closeConnections();
-            }
-        }
-    }
 
     private boolean isUsernameTaken(String username) {
         try {
@@ -220,54 +239,160 @@ public final class Users implements ActionListener {
         return false;
     }
 
-    private void editUser() {
-        int selectedRow = userTable.getSelectedRow();
-        if (selectedRow >= 0) {
-            int userId = (int) model.getValueAt(selectedRow, 0);
-            String currentUserName = (String) model.getValueAt(selectedRow, 1);
-            String currentFirstName = (String) model.getValueAt(selectedRow, 2);
-            String currentLastName = (String) model.getValueAt(selectedRow, 3);
-            String currentRole = (String) model.getValueAt(selectedRow, 4);
+    
+    
+private void editUser() {
+    int selectedRow = userTable.getSelectedRow();
+    if (selectedRow >= 0) {
+        int userId = (int) model.getValueAt(selectedRow, 0);
+        String currentUserName = (String) model.getValueAt(selectedRow, 1);
+        String currentFirstName = (String) model.getValueAt(selectedRow, 2);
+        String currentLastName = (String) model.getValueAt(selectedRow, 3);
+        String currentRole = (String) model.getValueAt(selectedRow, 4);
 
-            JTextField txtUserName = new JTextField(currentUserName);
-            JTextField txtFirstName = new JTextField(currentFirstName);
-            JTextField txtLastName = new JTextField(currentLastName);
-            JComboBox<String> cmbRole = new JComboBox<>(new String[]{"Admin", "User"});
-            cmbRole.setSelectedItem(currentRole);
-            JPasswordField txtCurrentPassword = new JPasswordField();
-            JPasswordField txtNewPassword = new JPasswordField();
+        JTextField txtUserName = new JTextField(currentUserName);
+        JTextField txtFirstName = new JTextField(currentFirstName);
+        JTextField txtLastName = new JTextField(currentLastName);
+        JComboBox<String> cmbRole = new JComboBox<>(new String[]{"Admin", "User"});
+        cmbRole.setSelectedItem(currentRole);
+        JPasswordField txtCurrentPassword = new JPasswordField();
+        JPasswordField txtNewPassword = new JPasswordField();
 
-            JPanel panel = new JPanel();
-            panel.setLayout(new GridLayout(8, 2)); // Layout for the form
-            panel.add(new JLabel("Username:"));
-            panel.add(txtUserName);
-            panel.add(new JLabel("First Name:"));
-            panel.add(txtFirstName);
-            panel.add(new JLabel("Last Name:"));
-            panel.add(txtLastName);
-            panel.add(new JLabel("Role:"));
-            panel.add(cmbRole);
-            panel.add(new JLabel("Current Password:"));
-            panel.add(txtCurrentPassword);
-            panel.add(new JLabel("New Password (Leave blank to keep unchanged):"));
-            panel.add(txtNewPassword);
+        // Create an error label (initially hidden)
+        JLabel errorLabel = new JLabel();
+        errorLabel.setForeground(Color.RED);
+        errorLabel.setFont(new Font("Arial", Font.BOLD, 18)); // Set font for the error label
+        errorLabel.setHorizontalAlignment(SwingConstants.CENTER); // Center the error label
+        errorLabel.setVisible(false); // Initially, the label is hidden
 
-            int option = JOptionPane.showConfirmDialog(frmUserManagement, panel, "Edit User", JOptionPane.OK_CANCEL_OPTION);
-            if (option == JOptionPane.OK_OPTION) {
-                String newUserName = txtUserName.getText().trim();
+        // Add all fields to a single array for JOptionPane, including the error label
+        Object[] message = {
+            "Username:", txtUserName,
+            "First Name:", txtFirstName,
+            "Last Name:", txtLastName,
+            "Role:", cmbRole,
+            "Current Password:", txtCurrentPassword,
+            "New Password (Leave blank to keep unchanged):", txtNewPassword,
+            errorLabel // Add error label to message
+        };
 
-                // Check if the username is taken
-                if (!newUserName.equals(currentUserName) && isUsernameTaken(newUserName)) {
-                    JOptionPane.showMessageDialog(frmUserManagement, "This username is already taken.", "Validation Error", JOptionPane.ERROR_MESSAGE);
-                    return;
-                }
+        boolean isValid = false; // Flag to track if validation is successful
 
-                // Handle password update and user data change logic...
+        while (!isValid) {
+            int option = JOptionPane.showConfirmDialog(frmUserManagement, message, "Edit User", JOptionPane.OK_CANCEL_OPTION);
+            if (option == JOptionPane.CANCEL_OPTION || option == JOptionPane.CLOSED_OPTION) {
+                return; // Exit the method if Cancel or X is pressed
             }
-        } else {
-            JOptionPane.showMessageDialog(frmUserManagement, "Please select a user to edit.");
+
+            // Reset error label visibility and text
+            errorLabel.setVisible(false);
+            errorLabel.setText("");
+
+            String newUserName = txtUserName.getText().trim();
+
+            // Check if the username is taken
+            if (!newUserName.equals(currentUserName) && isUsernameTaken(newUserName)) {
+                errorLabel.setText("This username is already taken.");
+                errorLabel.setVisible(true); // Show the error label
+                continue; // Keep the dialog open
+            }
+
+            // Check if fields are empty
+            if (newUserName.isEmpty() || txtFirstName.getText().trim().isEmpty() || txtLastName.getText().trim().isEmpty()) {
+                errorLabel.setText("Username, First Name, and Last Name are required.");
+                errorLabel.setVisible(true); // Show the error label
+                continue; // Keep the dialog open
+            }
+
+            // Check if current password is provided
+            String currentPassword = new String(txtCurrentPassword.getPassword()).trim();
+            if (currentPassword.isEmpty()) {
+                errorLabel.setText("Current password is required.");
+                errorLabel.setVisible(true); // Show the error label
+                continue; // Keep the dialog open
+            }
+
+            // Check if the current password is correct
+            if (!isCurrentPasswordCorrect(userId, currentPassword)) {
+                errorLabel.setText("Current password is incorrect.");
+                errorLabel.setVisible(true); // Show the error label
+                continue; // Keep the dialog open
+            }
+
+            // Handle password update logic
+            String password = new String(txtNewPassword.getPassword()).trim();
+            String hashedPassword = password.isEmpty() ? getCurrentPassword(userId) : BCrypt.hashpw(password, BCrypt.gensalt()); // Hash the password
+
+            // If validation passes, proceed with user update logic
+            try {
+                connection = new Database().getConnection();
+                String query = "UPDATE users SET userName = ?, firstname = ?, lastname = ?, role = ?, userPassword = ? WHERE userID = ?";
+                ps = connection.prepareStatement(query);
+                ps.setString(1, newUserName);
+                ps.setString(2, txtFirstName.getText());
+                ps.setString(3, txtLastName.getText());
+                ps.setString(4, cmbRole.getSelectedItem().toString());
+                ps.setString(5, hashedPassword); // Store hashed password
+                ps.setInt(6, userId); // Update the correct user
+
+                ps.executeUpdate();
+                JOptionPane.showMessageDialog(frmUserManagement, "User updated successfully."); // Show success message
+                loadUserTable();
+                isValid = true; // Exit the loop when validation is successful
+            } catch (SQLException e) {
+                JOptionPane.showMessageDialog(frmUserManagement, "Error updating user: " + e.getMessage());
+            } finally {
+                closeConnections();
+            }
         }
+    } else {
+        JOptionPane.showMessageDialog(frmUserManagement, "Please select a user to edit.");
     }
+}
+
+// Method to check if the current password is correct
+private boolean isCurrentPasswordCorrect(int userId, String currentPassword) {
+    try {
+        connection = new Database().getConnection();
+        String query = "SELECT userPassword FROM users WHERE userID = ?";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, userId);
+        rs = ps.executeQuery();
+
+        if (rs.next()) {
+            String storedPassword = rs.getString("userPassword");
+            return BCrypt.checkpw(currentPassword, storedPassword); // Compare the entered password with the stored hashed password
+        }
+    } catch (SQLException e) {
+        JOptionPane.showMessageDialog(frmUserManagement, "Error checking current password: " + e.getMessage());
+    } finally {
+        closeConnections();
+    }
+    return false; // Return false if there's an error or password doesn't match
+}
+
+private String getCurrentPassword(int userId) {
+    try {
+        connection = new Database().getConnection();
+        String query = "SELECT userPassword FROM users WHERE userID = ?";
+        ps = connection.prepareStatement(query);
+        ps.setInt(1, userId);
+        rs = ps.executeQuery();
+        
+        if (rs.next()) {
+            return rs.getString("userPassword"); // Return the current password
+        }
+    } catch (SQLException e) {
+        JOptionPane.showMessageDialog(frmUserManagement, "Error retrieving current password: " + e.getMessage());
+    } finally {
+        closeConnections();
+    }
+    return null; // Return null if there's an issue
+}
+
+
+
+
 
     private void deleteUser() {
         int selectedRow = userTable.getSelectedRow();
@@ -290,7 +415,15 @@ public final class Users implements ActionListener {
             JOptionPane.showMessageDialog(frmUserManagement, "Please select a user to delete.");
         }
     }
+
+
+  private void closeConnections() {
+        try {
+            if (rs != null) rs.close();
+            if (ps != null) ps.close();
+            if (connection != null) connection.close();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(frmUserManagement, "Error closing resources: " + e.getMessage());
+        }
+    }
 }
-
-
-

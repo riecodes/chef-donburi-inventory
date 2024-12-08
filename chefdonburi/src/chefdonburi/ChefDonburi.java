@@ -33,6 +33,7 @@ public class ChefDonburi {
         lblLogo.setSize(100, 100);  // Set logo size
         lblLogo.setLocation(70, 80);  // Set logo position
         pnlSplash.add(lblLogo);
+        
 
         // Set company name label
         lblStoreName = new JLabel("Chef Donburi");

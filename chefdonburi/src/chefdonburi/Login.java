@@ -1,5 +1,6 @@
 package chefdonburi;
 
+import Database.Database;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -28,7 +29,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 public class Login implements ActionListener {
     JFrame frmLogin;
     JPanel pnlLogin;
-    JLabel lblUser, lblPassword, lblTitle;
+    JLabel lblUser, lblPassword, lblTitle, lblError;
     JTextField txtUser;
     JPasswordField pswPassword;
     JButton btnLogin, btnClose;
@@ -45,7 +46,7 @@ public class Login implements ActionListener {
     public Login() {
         // Load the background image
         try {
-            backgroundImage = ImageIO.read(new File("src\\Images\\home_bg.jpg"));
+            backgroundImage = ImageIO.read(new File("src\\Images\\login_background.png"));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -74,15 +75,24 @@ public class Login implements ActionListener {
 
         // Title label
         lblTitle = new JLabel("Welcome");
-        lblTitle.setForeground(new Color(0, 0, 0));
+        lblTitle.setForeground(new Color(242, 245, 224));
         lblTitle.setFont(new Font("Georgia", Font.BOLD, 40));
         lblTitle.setSize(250, 50);
-        lblTitle.setLocation(925, 200);
+        lblTitle.setLocation(925, 180);
         pnlLogin.add(lblTitle);
+        
+                // Error message label
+        lblError = new JLabel();
+        lblError.setForeground(Color.ORANGE);
+        lblError.setFont(new Font("Arial", Font.BOLD, 18));
+        lblError.setSize(400, 25);
+        lblError.setLocation(870, 240); // Position below the welcome label
+        lblError.setVisible(false); // Initially hidden
+        pnlLogin.add(lblError);
 
         // Username label and text field
         lblUser = new JLabel("Username:");
-        lblUser.setForeground(new Color(0, 0, 0));
+        lblUser.setForeground(new Color(242, 245, 224));
         lblUser.setFont(new Font("Arial", Font.BOLD, 20));
         lblUser.setSize(200, 25);
         lblUser.setLocation(780, 270);
@@ -94,7 +104,7 @@ public class Login implements ActionListener {
 
         // Password label and password field
         lblPassword = new JLabel("Password:");
-        lblPassword.setForeground(new Color(0, 0, 0));
+        lblPassword.setForeground(new Color(242, 245, 224));
         lblPassword.setFont(new Font("Arial", Font.BOLD, 20));
         lblPassword.setSize(200, 25);
         lblPassword.setLocation(780, 320);
@@ -164,7 +174,8 @@ public class Login implements ActionListener {
         String password = new String(pswPassword.getPassword());
 
         if (username.isEmpty() || password.isEmpty()) {
-            JOptionPane.showMessageDialog(frmLogin, "Username or Password cannot be empty.");
+            lblError.setText("Username or Password cannot be empty.");
+            lblError.setVisible(true); // Show error message
             return;
         }
 
@@ -187,17 +198,21 @@ public class Login implements ActionListener {
                     frmLogin.dispose();
                     Home home = new Home(role, userID); // Open home screen
                 } else {
-                    JOptionPane.showMessageDialog(frmLogin, "Invalid username or password.");
+                    lblError.setText("Incorrect password.");
+                    lblError.setVisible(true); // Show password error message
                 }
             } else {
-                JOptionPane.showMessageDialog(frmLogin, "Invalid username or password.");
+                lblError.setText("Incorrect username.");
+                lblError.setVisible(true); // Show username error message
             }
         } catch (SQLException ex) {
-            JOptionPane.showMessageDialog(frmLogin, "Error connecting to database: " + ex.getMessage());
+            lblError.setText("Error connecting to database: " + ex.getMessage());
+            lblError.setVisible(true); // Show database error message
         } finally {
             closeConnections();
         }
     }
+
 
     private void logUserLogin(int userID) {
         try {
