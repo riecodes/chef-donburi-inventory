@@ -1,6 +1,5 @@
 package chefdonburi;
 
-import Database.Database;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
@@ -16,8 +15,7 @@ import java.text.ParseException;
 import java.util.Date;
 
 public final class Expenses implements ActionListener {
-    private double totalPrice;
-    
+
     JFrame frmExpenses;
     JTable expensesTable;
     DefaultTableModel model;
@@ -452,23 +450,14 @@ private void logExpenses(int userID, int id) {
 }
 
 
-    // Method to update the total price
-    private void updateTotalPrice() {        
+    private void updateTotalPrice() {
         double totalPrice = 0;
         for (int i = 0; i < model.getRowCount(); i++) {
-            totalPrice += (double) model.getValueAt(i, 2); // Assuming 2 is the column index for price
+            totalPrice += (double) model.getValueAt(i, 2);
         }
         lblTotalPrice.setText("Total Price: " + String.format("%.2f", totalPrice));
+    }
 
-        // Update totalPrice for the class
-        this.totalPrice = totalPrice;
-    }
-    
-    // Getter method to access totalPrice
-    public double getTotalPrice() {
-        return totalPrice;
-    }
-    
     private void closeConnections() {
         try {
             if (rs != null) rs.close();

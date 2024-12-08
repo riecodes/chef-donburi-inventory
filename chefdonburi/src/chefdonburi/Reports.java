@@ -392,7 +392,6 @@ private void generateExpensesReport() {
             // Add the Total Price row
         PdfPTable totalPriceTable = new PdfPTable(1);
         totalPriceTable.setWidthPercentage(100);
-        totalPriceTable.setWidths(new float[]{70, 30});
 
         PdfPCell totalPriceCell = new PdfPCell(new Phrase("Total Price: " + totalPrice, new Font(Font.HELVETICA, 12, Font.BOLD)));
         totalPriceCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
